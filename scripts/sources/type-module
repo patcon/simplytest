@@ -41,11 +41,13 @@ s_project_download() {
 ##
 # Fetch project dependecies.
 s_project_fetch_dependencies() {
+  cd "/home/$S_ID"
+
   # Fetch drupal core.
   lg "Fetch core.."
   # We'll directly clone it into the www directory, so delete it for git.
   rm -rf "/home/$S_ID/www"
-  timeout 350 drush dl --destination="/home/$S_ID" --drupal-project-rename="www" "drupal-$S_CORE"
+  timeout 350 drush dl --destination="/home/$S_ID" --drupal-project-rename="www" --default-major="$S_CORE" "drupal-$S_CORE"
 
   # Prepare the modules directory and copy it in.
   lg "Prepare the module project.."

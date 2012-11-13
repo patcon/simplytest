@@ -60,6 +60,8 @@ s_project_fetch_dependencies() {
 ##
 # Install project.
 s_project_install() {
+  cd "/home/$S_ID"
+
   # Setup database.
   lg "Setup database.."
   s_db_setup $S_ID
