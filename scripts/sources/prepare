@@ -1,0 +1,118 @@
+## Prepares the submissision environment.
+#
+# @todo figure out how to keep the config out of code.
+s_prepare() {
+
+  # Add temporary user with minium rights as cage.
+  adduser --system --home "/home/$S_ID/" --disabled-login --gecos "/dev/null" --shell "/dev/null" $S_ID || s_ste 8
+
+  # www directory and www/tmp will be re-created in chache_to_root().
+  mkdir "/home/$S_ID/www"
+  mkdir "/home/$S_ID/www/tmp"
+  chmod 777 "/home/$S_ID/www/tmp"
+
+  # Add secured vHost for apache.
+  echo "<VirtualHost *:80>
+  ServerName $S_ID.$S_HOST
+  ServerAlias *.$S_ID.$S_HOST
+  DocumentRoot /home/$S_ID/www
+  SuexecUserGroup $S_ID nogroup
+  <IfModule mod_fcgid.c>
+    FcgidInitialEnv PHPRC /home/$S_ID
+    FcgidWrapper /var/www/wrappers/$S_ID/php .php
+  </IfModule>
+  <Directory /home/$S_ID/www>
+    AllowOverride all
+    RewriteEngine on
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} ^/mysite/(.)$
+    RewriteRule ^(.*)$ /mysite/index.php?q=\$1 [L,QSA]
+    Allow from all
+    Options Indexes FollowSymLinks +Includes +ExecCGI
+    Order allow,deny
+  </Directory>
+  </VirtualHost>" > "/etc/apache2/sites-available/$S_ID"
+
+  # Write CGI wrapper (necessary for secure apache/cgi user change by suExec).
+  mkdir /var/www/wrappers/$S_ID
+  chown $S_ID /var/www/wrappers/$S_ID
+  chgrp nogroup /var/www/wrappers/$S_ID
+  echo "#!/bin/bash
+    umask 022
+    PHPRC=/home/$S_ID
+    export PHPRC
+    exec /usr/lib/cgi-bin/php" > "/var/www/wrappers/$S_ID/php"
+  chmod +x "/var/www/wrappers/$S_ID/php"
+  chown $S_ID /var/www/wrappers/$S_ID/php
+  chgrp nogroup /var/www/wrappers/$S_ID/php
+
+  # Write secured php.ini file.
+  echo "[PHP]
+    engine = On
+    short_open_tag = On
+    asp_tags = Off
+    precision = 14
+    y2k_compliance = On
+    output_buffering = 4096
+    zlib.output_compression = Off
+    implicit_flush = Off
+    unserialize_callback_func =
+    serialize_precision = 17
+    allow_call_time_pass_reference = Off
+    safe_mode = On
+    safe_mode_gid = Off
+    safe_mode_include_dir =
+    safe_mode_exec_dir = /home/$S_ID/www
+    safe_mode_allowed_env_vars = PHP_
+    safe_mode_protected_env_vars = LD_LIBRARY_PATH
+    open_basedir = /home/$S_ID/www
+    disable_functions = pcntl_alarm,pcntl_fork,pcntl_waitpid,pcntl_wait,pcntl_wifexited,pcntl_wifstopped,pcntl_wifsignaled,pcntl_wexitstatus,pcntl_wtermsig,pcntl_wstopsig,pcntl_signal,pcntl_signal_dispatch,pcntl_get_last_error,pcntl_strerror,pcntl_sigprocmask,pcntl_sigwaitinfo,pcntl_sigtimedwait,pcntl_exec,pcntl_getpriority,pcntl_setpriority,
+    disable_classes =
+    ignore_user_abort = Off
+    zend.enable_gc = On
+    expose_php = Off
+    max_execution_time = 15
+    max_input_time = 30
+    max_input_nesting_level = 32
+    memory_limit = 200M
+    error_reporting = E_ALL & ~E_DEPRECATED
+    display_errors = On
+    display_startup_errors = Off
+    log_errors = Off
+    log_errors_max_len = 1024
+    ignore_repeated_errors = Off
+    ignore_repeated_source = Off
+    report_memleaks = Off
+    track_errors = Off
+    variables_order = GPCS
+    request_order = GP
+    register_globals = Off
+    register_long_arrays = Off
+    register_argc_argv = Off
+    post_max_size = 2M
+    magic_quotes_gpc = Off
+    magic_quotes_runtime = Off
+    magic_quotes_sybase = Off
+    auto_prepend_file = /home/$S_ID/www/snippet.php
+    auto_append_file = 
+    default_mimetype = text/html
+    doc_root =
+    user_dir = /home/$S_ID/www
+    enable_dl = Off
+    file_uploads = On
+    upload_max_filesize = 2M
+    max_file_uploads = 5
+    allow_url_fopen = On
+    allow_url_include = Off
+    default_socket_timeout = 10
+    upload_tmp_dir = /home/$S_ID/www/tmp
+    sendmail_path = /bin/echo
+    " > "/home/$S_ID/php.ini"
+
+  # Enable vhost.
+  a2ensite $S_ID || s_ste 8
+
+  # Reload apache config.
+  service apache2 reload || s_ste 8
+}

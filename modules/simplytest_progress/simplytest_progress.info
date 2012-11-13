@@ -1,0 +1,11 @@
+name = simplytest progress
+description = Submission progress indicator.
+package = simplytest
+core = 7.x
+
+dependencies[] = simplytest_projects
+dependencies[] = simplytest_submissions
+dependencies[] = simplytest_launch
+
+scripts[] = simplytest_progress.js
+stylesheets[all][] = simplytest_progress.css

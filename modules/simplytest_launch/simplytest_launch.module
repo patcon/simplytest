@@ -1,0 +1,318 @@
+<?php
+
+/**
+ * @file
+ * Provides a submission launcher block for simplytest.me.
+ */
+
+/**
+ * Implements hook_block_info().
+ */
+function simplytest_launch_block_info() {
+  $blocks = array();
+  $blocks['simplytest_launcher'] = array(
+    'info' => t('simplytest launcher'),
+    'status' => TRUE,
+    'cache' => DRUPAL_NO_CACHE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => "<front>\nproject/*\nproject",
+    'region' => 'featured',
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_launch_menu() {
+  $items = array();
+  // Used for prefill by /project/[shortname][/version] functionality.
+  $items['project'] = array(
+    'page callback' => 'simplytest_start_page',
+    'access arguments' => array('access simplytest page'),
+    'type' => MENU_CALLBACK,
+  );
+  // JQuery autocomplete callback for the project shortname field.
+  $items['simplytest/projects/autocomplete'] = array(
+    'page callback' => 'simplytest_launch_project_autocomplete',
+    'access arguments' => array('submit simplytest requests'),
+    'type' => MENU_CALLBACK,
+  );
+  // JSON callback for returning available versions for a project.
+  $items['simplytest/project/%/versions'] = array(
+    'page callback' => 'simplytest_launch_project_versions_json',
+    'page arguments' => array(2),
+    'access arguments' => array('submit simplytest requests'),
+    'type' => MENU_CALLBACK,
+  );
+  // Settings page: Flood protection config.
+  $items['admin/simplytest/flood'] = array(
+    'title' => 'Flood protection',
+    'description' => 'Flood protection settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simplytest_launch_flood_form'),
+    'access arguments' => array('administer simplytest'),
+  );
+  return $items;
+}
+
+/**
+ * Flood settings configuration form.
+ */
+function simplytest_launch_flood_form($form = array()) { 
+
+  $form['simplytest_launch_flood_window'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Flood window in seconds'),
+    '#default_value' => variable_get('simplytest_launch_flood_window', 900),
+    '#element_validate' => array('element_validate_integer_positive'),
+  );
+
+  $form['simplytest_launch_flood_threshold'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Flood threshold'),
+    '#default_value' => variable_get('simplytest_launch_flood_threshold', 5),
+    '#element_validate' => array('element_validate_integer_positive'),
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function simplytest_launch_block_view($delta = '') {
+  if (!user_access('submit simplytest requests')) {
+    return;
+  }
+
+  switch ($delta) {
+    case 'simplytest_launcher':
+      $block['subject'] = t('Enter a project name:');
+      $block['content'] = drupal_get_form('simplytest_launch_block_launcher_form');
+      break;
+  }
+  return $block;
+}
+
+/**
+ * The submission launcher block form.
+ */
+function simplytest_launch_block_launcher_form($form = array()) {
+  $versions = array();
+  $project = NULL;
+  $version = NULL;
+
+  // Check whether there are default values available.
+  // Although I don't like using arg() we got no choise here as
+  // this form will be rendered within a block.
+  if (arg(0) === 'project') {
+    $project = trim(arg(1));
+    $version = trim(arg(2));
+    if (!empty($project)) {
+      $versions = simplytest_launch_project_versions_options($project);
+    }
+  }
+
+  // Flood protection check.
+  $enabled = _simplytest_launch_flood_check();
+  if (!$enabled) {
+    drupal_set_message(t('Unfortunately you hit the maximum usage quota. Please try again later.'), 'error');
+  }
+
+  // Project textfield.
+  $form['project'] = array(
+    '#type' => 'textfield',
+    // Use jQuery autocomplete for this field.
+    '#attached' => array(
+      'library' => array(
+        array('system', 'ui.autocomplete'),
+      ),
+    ),
+    '#default_value' => $project,
+    '#disabled' => !$enabled,
+  );
+
+  // Version select box.
+  $form['version'] = array(
+    '#type' => 'select',
+    '#options' => $versions,
+    '#default_value' => $version,
+    // Override illegal choice validation.
+    '#validated' => TRUE,
+    '#disabled' => !$enabled,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#default_value' => t('Launch sandbox'),
+    '#disabled' => !$enabled,
+  );
+  return $form;
+}
+
+/**
+ * The launcher block form submit handler.
+ */
+function simplytest_launch_block_launcher_form_submit(&$form, &$form_state) {
+  $project = trim($form_state['values']['project']);
+  $version = $form_state['values']['version'];
+
+  // Flood protection check.
+  $enabled = _simplytest_launch_flood_check();
+  // Register event to anti-flood mechanism.
+  _simplytest_launch_flood_inc();
+  if (!$enabled) {
+    return;
+  }
+
+  // Check whether a project shortname was submitted.
+  if (empty($project)) {
+    form_set_error('project', t('Please enter a project shortname to launch a sandbox for.'));
+    drupal_goto();
+  }
+
+  // Before we try to fetch anything, check whether this shortname is valid.
+  if (preg_match('/[^a-z_\-0-9]/i', $project)) {
+    form_set_error('project', t('Please enter a valid shortname of a module, theme or distribution.'));
+    drupal_goto();
+  }
+
+  // Get available project versions.
+  $versions = simplytest_projects_get_versions($project);
+
+  // Check whether the submitted project exists.
+  if ($versions === FALSE) {
+    form_set_error('project', t('The selected project shortname %project could not be found.',
+      array('%project' => $project)
+    ));
+    drupal_goto('project/' . $project);
+  }
+
+  // Check whether the selected version is valid / a version was chosen.
+  elseif (empty($versions['heads']) && empty($versions['tags'])) {
+    form_set_error('project', t('The selected project %project has no available releases.',
+      array('%project' => $project)
+    ));
+    drupal_goto('project/' . $project);
+  }
+  elseif (empty($version)) {
+    form_set_error('project', t('No version was selected for the requested project.',
+      array('%project' => $project)
+    ));
+    drupal_goto('project/' . $project);
+  }
+  elseif (!isset($versions['tags'][$version]) && !isset($versions['heads'][$version])) {
+    form_set_error('project', t('There is no release available with the selected version %version.',
+      array('%version' => $version)
+    ));
+    drupal_goto('project/' . $project);
+  }
+
+  // Everything seems fine, enqueue submission and start progress indicator.
+  else {
+
+    // Enqueue the submission.
+    $submission_id = simplytest_submissions_enqueue($project, $version);
+
+    watchdog('simplytest_launch', 'Submitted "%project": %version for launching a sandbox: %sid', array(
+      '%project' => $project,
+      '%version' => $version,
+      '%sid' => $submission_id,
+    ), WATCHDOG_NOTICE);
+
+    // Redirect to the progress page.
+    drupal_goto('progress/' . $submission_id);
+
+  }
+}
+
+/**
+ * Autocomplete for project textfield.
+ */
+function simplytest_launch_project_autocomplete() {
+  $matches = array();
+  if (isset($_GET['string']) && ($string = $_GET['string'])) {
+    // Search for projects and create option list.
+    foreach (simplytest_projects_search_project($string) as $project) {
+      $label = '';
+      // Cut long "shortnames".
+      if (strlen($project->title) > 35) {
+        $project->title = substr($project->title, 0, 32) . '...';
+      }
+      $label = '<strong>' . check_plain($project->title) . '</strong>';
+      if ($project->sandbox) {
+        // Make sandbox project items themeable (to highlight them).
+        $label = '<span class="sandbox-project">' . $label. '</span>';
+        $project->type = 'Sandbox ' . $project->type;
+      }
+      if (isset($project->type)) {
+        $label .= '<span class="project-type">' . check_plain($project->type) . '</span>';
+      }
+      $matches[] = (object) array(
+        'label' => $label,
+        'shortname' => $project->shortname,
+      );
+    }
+  }
+  drupal_json_output($matches);
+}
+
+/**
+ * Returns json data about all available versions.
+ */
+function simplytest_launch_project_versions_json($project) {
+  $matches = array();
+  $project = trim($project);
+  if (!empty($project)) {
+    $matches = simplytest_launch_project_versions_options($project);
+  }
+  drupal_json_output($matches);
+}
+
+/**
+ * Returns structured version data for use in a select input.
+ */
+function simplytest_launch_project_versions_options($project) {
+  $versions = array();
+  $versions_data = simplytest_projects_get_versions($project);
+  if ($versions_data !== FALSE) {
+    foreach ($versions_data['tags'] as $version_data) {
+      // Find out major / api version for structure.
+      if (is_numeric($version_data[0])) {
+        $api_version = 'Drupal ' . $version_data[0];
+      }
+      else {
+        // Prefixed with space to get it sorted to the bottom.
+        $api_version = t(' Other');
+      }
+      $versions[$api_version][$version_data] = $version_data;
+    }
+    foreach ($versions_data['heads'] as $version_data) {
+      $versions[t('Branches')][$version_data] = $version_data;
+    }
+  }
+  // Sort it in reverse: Drupal 7, Drupal 6, Branches, Other.
+  krsort($versions);
+  return $versions;
+}
+
+/**
+ * Check whether current user is allowed to submit the form.
+ *
+ * @return bool
+ *  Whether he's allowed or not.
+ */
+function _simplytest_launch_flood_check() {
+  return flood_is_allowed('simplytest_launch_submit',
+    variable_get('simplytest_launch_flood_threshold', 5),
+    variable_get('simplytest_launch_flood_window', 900))
+    || user_access('bypass antiflood');
+}
+
+/**
+ * Registers a submission as flood event and increases the counter.
+ */
+function _simplytest_launch_flood_inc() {
+  flood_register_event('simplytest_launch_submit', variable_get('simplytest_launch_flood_window', 900));
+}

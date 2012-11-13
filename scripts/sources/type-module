@@ -1,0 +1,85 @@
+##
+# Setup for modules.
+#
+# Available globals:
+#  S_ID       Submission id.
+#  S_GITURL   Project git url.
+#  S_TYPE     Project type.
+#  S_VERSION  Project version.
+#  S_PROJECT  Project shortname.
+##
+
+##
+# Download project.
+s_project_download() {
+  # Clone project into the user home temporarily.
+  lg "Fetch drupal module project.."
+  s_fetch_project "$S_PROJECT" "$S_GITURL" "/home/$S_ID/$S_PROJECT"
+
+  # Checkout specified version and remove .git.
+  lg "Set project version.."
+  s_set_version "/home/$S_ID/$S_PROJECT" $S_VERSION
+
+  # Try to find out "real" project filename (eg, shortname: cck -> filename: content).
+  lg "Finding out real project (file) name.."
+  S_PROJECT_FILE=$(s_get_project_filename "/home/$S_ID/$S_PROJECT")
+  if [[ -z $S_PROJECT_FILE ]]; then
+    S_PROJECT_FILE=$S_PROJECT
+  fi
+  lg "-> projectfile name: $S_PROJECT_FILE"
+
+  # Try to discover the main info file.
+  S_INFO_FILE=$(s_discover_info_file "/home/$S_ID/$S_PROJECT")
+  lg "-> discovered info file: $S_INFO_FILE"
+
+  # Find out needed major core version.
+  lg "Finding out needed major core version"
+  S_CORE=$(s_get_project_coreversion "$S_INFO_FILE")
+  lg "-> major core version: $S_CORE"
+}
+
+##
+# Fetch project dependecies.
+s_project_fetch_dependencies() {
+  # Fetch drupal core.
+  lg "Fetch core.."
+  # We'll directly clone it into the www directory, so delete it for git.
+  rm -rf "/home/$S_ID/www"
+  timeout 350 drush dl --destination="/home/$S_ID" --drupal-project-rename="www" "drupal-$S_CORE"
+
+  # Prepare the modules directory and copy it in.
+  lg "Prepare the module project.."
+  mkdir "/home/$S_ID/www/sites/default/modules"
+  cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/sites/default/modules" || s_ste 10
+
+  # Resolve dependencies.
+  lg "Resolve dependencies"
+  s_resolve_dependencies "/home/$S_ID/www" "sites/default"
+}
+
+##
+# Install project.
+s_project_install() {
+  # Setup database.
+  lg "Setup database.."
+  s_db_setup $S_ID
+
+  # Install drupal in docroot.
+  lg "Install drupal core.."
+  s_install_drupal $S_CORE $S_CURRENT_CORE
+
+  # Choose the first make fill it can find.
+  # @todo Missing libraries / respect make files #1835884.
+  S_MAKEFILE=$(ls -l "/home/$S_ID/$S_PROJECT" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
+  if [[ -n "$S_MAKEFILE" ]]; then
+    lg "-> found makefile: $S_MAKEFILE"
+    # Try to build site by make file.
+    cd "/home/$S_ID/www"
+    lg "Building site with makefile.."
+    timeout 350 drush make "/home/$S_ID/$S_PROJECT/$S_MAKEFILE" -y
+  fi
+
+  # Install the module.
+  lg "Install the module project.."
+  s_install_module "/home/$S_ID/$S_PROJECT" "$S_PROJECT_FILE" "$S_CORE"
+}

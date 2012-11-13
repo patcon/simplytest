@@ -1,0 +1,48 @@
+##
+# Setup for drupal core.
+#
+# Available globals:
+#  S_ID       Submission id.
+#  S_GITURL   Project git url.
+#  S_TYPE     Project type.
+#  S_VERSION  Project version.
+#  S_PROJECT  Project shortname.
+##
+
+##
+# Download project.
+s_project_download() {
+  # Fetch project.
+  lg "Fetch drupal core project.."
+  # We'll directly clone it into the www directory, so delete it for git.
+  rm -rf "/home/$S_ID/www"
+  # Now clone it.
+  s_fetch_project "$S_PROJECT" "$S_GITURL" "/home/$S_ID/www"
+
+  # Checkout specified version and remove .git.
+  lg "Set version.."
+  s_set_version "/home/$S_ID/www" $S_VERSION
+}
+
+##
+# Fetch project dependecies.
+s_project_fetch_dependencies() {
+  : # No dependencies to fetch for a core project.
+}
+
+##
+# Install project.
+s_project_install() {
+  # Setup database.
+  lg "Setup database.."
+  s_db_setup $S_ID
+
+  # Try to find out core version.
+  lg "Find out coreversion.."
+  S_COREVERSION=$(s_get_coreversion)
+  lg "-> coreversion: $S_COREVERSION"
+
+  # Install drupal in docroot.
+  lg "Install drupal core.."
+  s_install_drupal $S_COREVERSION $S_VERSION
+}

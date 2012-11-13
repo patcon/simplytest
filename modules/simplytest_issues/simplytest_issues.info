@@ -1,0 +1,7 @@
+name = simplytest issues
+description = Issue summary block of simplytest.me d.o project.
+package = simplytest
+core = 7.x
+
+dependencies[] = block
+stylesheets[all][] = simplytest_issues.css

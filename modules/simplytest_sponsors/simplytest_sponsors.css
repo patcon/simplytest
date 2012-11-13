@@ -1,0 +1,21 @@
+/* sponsor list block */
+#block-simplytest-sponsors-simplytest-sponsors-list .item-list li {
+  display: inline;
+  margin-right: 10px;
+}
+
+#block-simplytest-sponsors-simplytest-sponsors-list .item-list ul {
+  padding: 0;
+}
+
+/* sponsor ad block */
+#block-simplytest-sponsors-simplytest-sponsors-ad {
+  text-align: center;
+}
+
+#block-simplytest-sponsors-simplytest-sponsors-ad .sponsor-ad-info {
+  display: block;
+  color: #888;
+  text-transform: uppercase;
+  font-size: 10px;
+}

@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * Schema for the simplytest submissions table.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function simplytest_submissions_schema() {
+  $schema = array();
+  // Table structure of socialhub_submissions.
+  $schema['simplytest_submissions'] = array(
+    'description' => 'Stores details about launched submissions.',
+    'fields' => array(
+      'number' => array(
+        'description' => 'Submission number drawed.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'id' => array(
+        'description' => 'The unique submission id.',
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+      ),
+      'ip' => array(
+        'description' => 'IP address.',
+        'type' => 'varchar',
+        'length' => 40,
+        'not null' => TRUE,
+      ),
+      'data' => array(
+        'description' => 'A serialized array of submission data.',
+        'type' => 'blob',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'timestamp' => array(
+        'description' => 'Timestamp of the submission.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'state' => array(
+        'description' => 'Current submission state.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'url' => array(
+        'description' => 'The target sandbox site to redirect to.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'state' => array('state'),
+    ),
+    'primary key' => array('id'),
+  );
+  return $schema;
+}

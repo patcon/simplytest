@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * Schema for the simplytest projects table.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function simplytest_projects_schema() {
+  $schema = array();
+  // Table structure of socialhub_publish.
+  $schema['simplytest_projects'] = array(
+    'description' => 'Stores details about drupal.org projects.',
+    'fields' => array(
+      'title' => array(
+        'description' => 'The human readable title of the project.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'shortname' => array(
+        'description' => 'The shortname of the project.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'sandbox' => array(
+        'description' => 'Boolean indicating whether the project is a sandbox.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'creator' => array(
+        'description' => 'The creator of the project.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'type' => array(
+        'description' => 'The project type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'versions' => array(
+        'description' => 'A serialized array containing all available versions of the project.',
+        'type' => 'blob',
+        'not null' => FALSE,
+        'size' => 'big',
+      ),
+      'timestamp' => array(
+        'description' => 'Timestamp of the last time the version data was renewed.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'title' => array('title'),
+      'shortname' => array('shortname'),
+    ),
+  );
+  return $schema;
+}

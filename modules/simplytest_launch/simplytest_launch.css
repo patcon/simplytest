@@ -1,0 +1,41 @@
+/* Launcher block form */
+#simplytest-launch-block-launcher-form input.form-text {
+  background-color: #EFF2F5;
+  color: #444;
+  min-width: 200px;
+}
+#simplytest-launch-block-launcher-form .form-select {
+  background-color: #EFF2F5;
+  color: #444;
+}
+#simplytest-launch-block-launcher-form .form-submit {
+  float: right;
+}
+#simplytest-launch-block-launcher-form .form-item {
+  display: inline;
+}
+#simplytest-launch-block-launcher-form #edit-project {
+  width: 400px;
+}
+
+/* jQuery autocomplete */
+.ui-autocomplete.ui-menu  {
+  font-size: 14px;
+  line-height: 18px;
+  cletter-spacing: -1px;
+  color: #EEE;
+  font-family: Arial, monospace;
+  max-height: 250px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+.ui-autocomplete.ui-menu .project-type {
+  float: right;
+  color: #4AA6D1;
+}
+.ui-autocomplete.ui-menu .sandbox-project {
+  color: #B8B8B8;
+}
+.ui-autocomplete-loading {
+  background: url(throbber.gif) right center no-repeat;
+}

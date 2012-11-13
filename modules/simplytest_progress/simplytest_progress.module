@@ -1,0 +1,274 @@
+<?php
+
+/**
+ * @file
+ * Provides a submission progress indicator.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_progress_menu() {
+  $items = array();
+  // Progress indicator page for a specific submission.
+  $items['progress/%'] = array(
+    'page callback' => 'simplytest_progress_page',
+    'page arguments' => array(1),
+    'access arguments' => array('submit simplytest requests'),
+    'type' => MENU_CALLBACK,
+  );
+  // JSON progress indicator state callback.
+  $items['progress/%/state'] = array(
+    'page callback' => 'simplytest_progress_state_json',
+    'page arguments' => array(1),
+    'access arguments' => array('submit simplytest requests'),
+    'type' => MENU_CALLBACK,
+  );
+  // Redirection page to final sandbox environment url.
+  $items['goto/%'] = array(
+    'page callback' => 'simplytest_progress_goto',
+    'page arguments' => array(1),
+    'access arguments' => array('submit simplytest requests'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Progress indicator page for a specific submission.
+ *
+ * @param string $id
+ *  The submission id to return a progress bar page for.
+ */
+function simplytest_progress_page($id) {
+  // Try to get state of submission.
+  if (($state = simplytest_progress_state($id)) == FALSE) {
+    drupal_set_message(t('The requested submission is not available.'), 'error');
+    drupal_goto();
+  }
+  // Return a progress bar and attach own javascript.
+  return array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('simplytest-progress-bar'),
+    ),
+    '#attached' => array(
+      'js' => array(
+        array(
+          'data' => array('simplytest_progress' => array('id' => $id)),
+          'type' => 'setting',
+        ),
+      ),
+    ),
+    'progress-bar' => array(
+      '#theme' => 'progress_bar',
+      '#percent' => $state['percent'],
+      '#message' => $state['message'],
+    ),
+  );
+}
+
+/**
+ * JSON progress indicator state callback.
+ *
+ * @param string $id
+ *  The submission id to return indication json for.
+ */
+function simplytest_progress_state_json($id) {
+  simplytest_submissions_process_submission($id);
+  drupal_json_output(simplytest_progress_state($id));
+}
+
+/**
+ * Returns progress information for a submission.
+ */
+function simplytest_progress_state($id) {
+  // Get current submission state.
+  $state = simplytest_submissions_get_state($id);
+  if ($state === FALSE) {
+    return;
+  }
+
+  // Get total/current count of steps.
+  list($total, $current) = simplytest_progress_steps($state);
+  // Get progress percentage.
+  $percent = simplytest_progress_percentage($total, $current);
+  // Get state message.
+  $message = simplytest_progress_message($state, $id);
+
+  return array(
+    'percent' => $percent,
+    'message' => $message,
+  );
+}
+
+/**
+ * Formats the percent completion of a progress bar.
+ *
+ * @param int $total
+ *   The total number of operations.
+ * @param int $current
+ *   The number of the current operation. This may be a floating point number
+ *   rather than an integer in the case of a multi-step operation that is not
+ *   yet complete; in that case, the fractional part of $current represents the
+ *   fraction of the operation that has been completed.
+ *
+ * @return string
+ *   The properly formatted percentage, as a string. We output percentages
+ *   using the correct number of decimal places so that we never print "100%"
+ *   until we are finished, but we also never print more decimal places than
+ *   are meaningful.
+ *
+ * @see _batch_api_percentage()
+ */
+function simplytest_progress_percentage($total, $current) {
+  if (!$total || $total == $current) {
+    // If $total doesn't evaluate as true or is equal to the current set, then
+    // we're finished, and we can return "100".
+    $percentage = "100";
+  }
+  else {
+    // We add a new digit at 200, 2000, etc. (since, for example, 199/200
+    // would round up to 100% if we didn't).
+    $decimal_places = max(0, floor(log10($total / 2.0)) - 1);
+    do {
+      // Calculate the percentage to the specified number of decimal places.
+      $percentage = sprintf('%01.' . $decimal_places . 'f', round($current / $total * 100, $decimal_places));
+      // When $current is an integer, the above calculation will always be
+      // correct. However, if $current is a floating point number (in the case
+      // of a multi-step batch operation that is not yet complete), $percentage
+      // may be erroneously rounded up to 100%. To prevent that, we add one
+      // more decimal place and try again.
+      $decimal_places++;
+    } while ($percentage == '100');
+  }
+  return $percentage;
+}
+
+/**
+ * Finds out the count of total progress steps and the count of
+ * completed steps by submission state.
+ *
+ * @param int $state
+ *  Current submission state.
+ *
+ * @return array
+ *  Array consisting of:
+ *   - the total count of steps.
+ *   - the completed count of steps.
+ */
+function simplytest_progress_steps($state) {
+  $total = 5;
+  $current = 5;
+
+  switch ($state) {
+    case SIMPLYTEST_SUBMISSIONS_ENQUEUE:
+      $current = 0;
+      break;
+    case SIMPLYTEST_SUBMISSIONS_PREPARE:
+      $current = 1;
+      break;
+    case SIMPLYTEST_SUBMISSIONS_DOWNLOAD:
+      $current = 2;
+      break;
+    case SIMPLYTEST_SUBMISSIONS_INSTALLING:
+      $current = 3;
+      break;
+    case SIMPLYTEST_SUBMISSIONS_FINALIZE:
+      $current = 4;
+      break;
+    case SIMPLYTEST_SUBMISSIONS_FINISHED:
+      $current = 5;
+      break;
+  }
+
+  return array($total, $current);
+}
+
+/**
+ * Generates a progress message for a submission state.
+ *
+ * @param int $state
+ *  Current submission state.
+ * @param string $id
+ *  The submission id.
+ *
+ * @return string
+ *  A progress message string for the current state.
+ */
+function simplytest_progress_message($state, $id = NULL) {
+  $message = '';
+  switch ($state) {
+    case SIMPLYTEST_SUBMISSIONS_ENQUEUE:
+      if (isset($id)) {
+        $message = t('Your submission is enqueued (#!position)..',
+          array('!position' => simplytest_submissions_get_position($id)));
+      }
+      else {
+        $message = t('Your submission is enqueued..');
+      }
+      break;
+    case SIMPLYTEST_SUBMISSIONS_PREPARE:
+      $message = t('The environment is beeing prepared..');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_DOWNLOAD:
+      $message = t('Fetching and downloading dependencies..');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_INSTALLING:
+      $message = t('Setup and installation..');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_FINALIZE:
+      $message = t('Final polish..');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_FINISHED:
+      $message = t('Finished!');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_TERMINATED:
+      $message = t('This submission is already terminated.');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_ERROR_SERVER:
+      $message = t('An error occurred while launching the submission.');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_ERROR_PREPARE:
+      $message = t('An error occurred while preparing the environment.');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_ERROR_DOWNLOAD:
+      $message = t('An error occurred while downloading dependencies.');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_ERROR_INSTALLING:
+      $message = t('An error occurred while installing the environment.');
+      break;
+    case SIMPLYTEST_SUBMISSIONS_ABORTED:
+      $message = t('The requested submission was aborted.');
+      break;
+    default:
+      $message = t('An unknown error occurred.');
+  }
+  return $message;
+}
+
+/**
+ * Redirection page callback, to the final sandbox location.
+ */
+function simplytest_progress_goto($id) {
+  $state = simplytest_submissions_get_state($id);
+  if ($state === FALSE) {
+    drupal_set_message(t('The requested submission is not available.'), 'error');
+    drupal_goto();
+  }
+  switch ($state) {
+    case SIMPLYTEST_SUBMISSIONS_ENQUEUE:
+    case SIMPLYTEST_SUBMISSIONS_PREPARE:
+    case SIMPLYTEST_SUBMISSIONS_DOWNLOAD:
+    case SIMPLYTEST_SUBMISSIONS_INSTALLING:
+    case SIMPLYTEST_SUBMISSIONS_FINALIZE:
+      drupal_goto('progress/' . $id);
+      break;
+    case SIMPLYTEST_SUBMISSIONS_FINISHED:
+      simplytest_submissions_goto($id);
+      break;
+    default:
+      drupal_set_message(simplytest_progress_message($state, $id), 'error');
+      drupal_goto();
+  }
+}

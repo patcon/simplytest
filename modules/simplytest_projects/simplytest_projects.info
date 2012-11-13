@@ -1,0 +1,4 @@
+name = simplytest projects
+description = Handles drupal.org project data.
+package = simplytest
+core = 7.x

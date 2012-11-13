@@ -1,0 +1,40 @@
+name = Simplytesty
+description = The simplytest.me default theme.
+core = 7.x
+engine = phptemplate
+
+stylesheets[all][] = style.css
+stylesheets[screen and (max-width: 1030px)][] = style-small.css
+stylesheets[screen and (max-width: 575px)][] = style-narrow.css
+
+scripts[] = js/main.js
+
+regions[featured]       = Featured
+regions[featured_help]  = Featured help
+regions[sidebar_first]  = First Sidebar
+regions[header]         = Header
+regions[preface_first]  = Preface first
+regions[preface_middle] = Preface middle
+regions[preface_last]   = Preface last
+regions[content_top]    = Content Top
+regions[content]        = Content
+regions[help]           = Help
+regions[footer]         = Footer
+regions[bottom_first]   = Footer first
+regions[bottom_middle]  = Footer middle
+regions[bottom_last]    = Footer last
+regions[footer_first]   = First Bottom
+regions[footer_second]  = Second Bottom
+regions[footer_third]   = Third Bottom
+regions[footer_fourth]  = Fourth Bottom
+regions[footer_menu]    = Footer menu
+
+features[] = logo
+features[] = name
+features[] = slogan
+features[] = node_user_picture
+features[] = comment_user_pictureg
+features[] = comment_user_verification
+features[] = favicon
+features[] = main_menu
+features[] = secondary_menu

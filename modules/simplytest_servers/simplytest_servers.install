@@ -1,0 +1,45 @@
+<?php
+
+/**
+ * @file
+ * Schema for the simplytest submissions table.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function simplytest_servers_schema() {
+  $schema = array();
+  // Table structure of socialhub_servers.
+  $schema['simplytest_servers'] = array(
+    'description' => 'Stores details about launched submissions.',
+    'fields' => array(
+      'id' => array(
+        'description' => 'Primary Key: unique server ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'data' => array(
+        'description' => 'A serialized array of server config.',
+        'type' => 'blob',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'slots' => array(
+        'description' => 'Currently free slots.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'active' => array(
+        'description' => 'Current server state.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('number', 'id'),
+  );
+  return $schema;
+}

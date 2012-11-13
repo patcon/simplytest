@@ -1,0 +1,5 @@
+name = simplytest servers
+description = Server management
+package = simplytest
+core = 7.x
+dependencies[] = simplytest_submissions

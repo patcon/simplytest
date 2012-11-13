@@ -1,0 +1,7 @@
+name = simplytest sponsors
+description = Provides managable sponsor blocks and advertisement.
+package = simplytest
+core = 7.x
+
+dependencies[] = block
+stylesheets[all][] = simplytest_sponsors.css

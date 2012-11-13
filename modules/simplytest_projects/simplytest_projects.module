@@ -1,0 +1,467 @@
+<?php
+
+/**
+ * @file
+ * Handles drupal.org project data.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_projects_menu() {
+  $items = array();
+  // General configuration form.
+  $items['admin/simplytest/projects'] = array(
+    'title' => 'Projects',
+    'description' => 'Project settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simplytest_projects_form'),
+    'access arguments' => array('administer simplytest'),
+  );
+  return $items;
+}
+
+/**
+ * Configuration form.
+ */
+function simplytest_projects_form($form = array()) {
+
+  $form['simplytest_projects_version_timeout'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum age of version data'),
+    '#default_value' => variable_get('simplytest_projects_version_timeout', '-1 hour'),
+    '#description' => t('Example: %example', array('%example' => '-1 hour')),
+  );
+
+  $form['simplytest_projects_blacklisted_projects'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Blacklisted project'),
+    '#description' => t('A list of project shortnames to disable.'),
+    '#default_value' => implode(PHP_EOL, variable_get('simplytest_projects_blacklisted_projects', array())),
+  );
+
+  $form['simplytest_projects_blacklisted_versions'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Blacklisted versions'),
+    '#description' => t('A list of regular expressions for versions to disable.'),
+    '#default_value' => implode(PHP_EOL, variable_get('simplytest_projects_blacklisted_versions', array())),
+  );
+
+  $form = system_settings_form($form);
+
+  // We need to call our own submit callback first, not the one from
+  // system_settings_form(), so that we can process and save the blacklists.
+  unset($form['#submit']);
+  
+  $form['actions']['clear_version_cache'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save and flush version cache'),
+  );
+
+  return $form;
+}
+
+/**
+ * Configuration form submit handler.
+ */
+function simplytest_projects_form_submit($form, $form_state) {
+  // Save blacklists.
+  $blacklist_projects = explode(PHP_EOL, trim($form_state['values']['simplytest_projects_blacklisted_projects']));
+  $blacklist_versions = explode(PHP_EOL, trim($form_state['values']['simplytest_projects_blacklisted_versions']));
+  foreach ($blacklist_projects as $key => &$project) {
+    $project = trim($project);
+    if (empty($project)) {
+      unset($blacklist_projects[$key]);
+    }
+  }
+  foreach ($blacklist_versions as $key => &$version) {
+    $version = trim($version);
+    if (empty($version)) {
+      unset($blacklist_versions[$key]);
+    }
+  }
+  variable_set('simplytest_projects_blacklisted_projects', $blacklist_projects);
+  variable_set('simplytest_projects_blacklisted_versions', $blacklist_versions);
+  unset($form_state['values']['simplytest_projects_blacklisted_projects']);
+  unset($form_state['values']['simplytest_projects_blacklisted_versions']);
+
+  // Flush (obsolete) the version cache if desired.
+  if ($form_state['values']['op'] == t('Save and flush version cache')) {
+    db_update('simplytest_projects')
+      ->fields(array(
+        'timestamp' => 0,
+      ))
+      ->execute();
+  }
+
+  // Save the rest like using system_settings_form() normaly.
+  system_settings_form_submit($form, $form_state);
+}
+
+/**
+ * Returns available information about a project.
+ *
+ * @param string $project
+ *  The projects shortname to return information about.
+ *
+ * @return array
+ *  An assocciative array containing:
+ *   - title: The human readable project title.
+ *   - type: The projects type.
+ *   - creator: The drupal.org user who created it.
+ *   - giturl: The project's git url.
+ *   - sandbox: Whether it's a sandbox.
+ */
+function simplytest_projects_get_project($project) {
+  // Get general information from database.
+  $data = db_select('simplytest_projects', 'p')
+    ->fields('p', array('title', 'type', 'sandbox', 'creator'))
+    ->condition('shortname', $project)
+    ->execute()->fetchObject();
+
+  if (!$data) {
+    // Need to fetch initial project data.
+    $data = simplytest_projects_fetch_project($project);
+    if ($data === FALSE) {
+      return FALSE;
+    }
+    $data = (object) $data;
+  }
+
+  // Generate the git url to clone the project from.
+  if ($data->sandbox) {
+    $giturl = 'git://git.drupal.org/sandbox/' . $data->creator . '/' . $project . '.git';
+  }
+  else {
+    $giturl = 'git://git.drupal.org/project/' . $project . '.git';
+  }
+
+  return array(
+    'title' => $data->title,
+    'type' => $data->type,
+    'creator' => $data->creator,
+    'giturl' => $giturl,
+    'sandbox' => (bool) $data->sandbox,
+  );
+}
+
+/**
+ * Searches the database for projects by prefix.
+ *
+ * @param string $string
+ *  The prefix string to search projects for.
+ * @param int $range
+ *  Maximum number of results to return.
+ *
+ * @return array
+ *  An array of standard objects containing:
+ *   - title: The human readable project title.
+ *   - type: The projects type.
+ *   - shortname: The project machine/shortname.
+ *   - sandbox: Whether it's a sandbox.
+ */
+function simplytest_projects_search_project($string, $range = 100) {
+  $db_or = db_or()
+    ->condition('title', db_like($string) . '%', 'LIKE')
+    ->condition('shortname', db_like($string) . '%', 'LIKE');
+  $result = db_select('simplytest_projects', 'p')
+    ->fields('p', array('title', 'shortname', 'type', 'sandbox'))
+    ->orderBy('sandbox', 'ASC')
+    ->condition($db_or)
+    ->range(0, $range)->execute()->fetchAll();
+
+  if (is_array($result) && $result) {
+    foreach ($result as $id => $entry) {
+      // Check results for blacklisted projects.
+      foreach (variable_get('simplytest_projects_blacklisted_projects', array()) as $blacklisted) {
+        if ($entry->shortname == $blacklisted) {
+          unset($result[$id]);
+        }
+      }
+    }
+  }
+  else {
+    $result = array();
+  }
+  return $result;
+}
+
+/**
+ * Returns all available versions for a project.
+ *
+ * @param string $project
+ *  The project's shortname to return available versions for.
+ *
+ * @return array
+ *  An associative array containing:
+ *   - tags: Existing tags of the project.
+ *   - heads: Existing heads of the project. 
+ */
+function simplytest_projects_get_versions($project) {
+  // Check blacklist for project.
+  foreach (variable_get('simplytest_projects_blacklisted_projects', array()) as $blacklisted) {
+    if ($project == $blacklisted) {
+      return FALSE;
+    }
+  }
+  // Try to get current version data out of database.
+  $timeout = strtotime(variable_get('simplytest_projects_version_timeout', '-1 hour'));
+  $result = db_select('simplytest_projects', 'p')
+    ->fields('p', array('versions'))
+    ->condition('shortname', $project)
+    ->condition('timestamp', $timeout, '>')
+    ->execute()->fetchField();
+  // Found recent results in database.
+  if ($result) {
+    return unserialize($result);
+  }
+  else {
+    // Need to fetch fresh results.
+    return simplytest_projects_fetch_versions($project);
+  }
+}
+
+/**
+ * Fetches, saves and returns all available versions for a project.
+ *
+ * @param string $project
+ *  The project's shortname to fetch available versions for.
+ *
+ * @return array
+ *  An associative array containing:
+ *   - tags: Existing tags of the project.
+ *   - heads: Existing heads of the project.
+ */
+function simplytest_projects_fetch_versions($project) {
+  // Check whether project is known in database.
+  $project_data = simplytest_projects_get_project($project);
+
+  if ($project_data['sandbox']) {
+    $drupalcode_url = 'http://drupalcode.org/sandbox/' . $project_data['creator'] . '/' . $project . '.git';
+  }
+  else {
+    $drupalcode_url = 'http://drupalcode.org/project/' . $project . '.git';
+  }
+
+  // Fetch tags by request.
+  $result = drupal_http_request($drupalcode_url . '/tags');
+  if (!isset($result->data) || $result->code != 200) {
+    watchdog('simplytest_projects', 'Failed to fetch version data for %project (Requested tags).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  // Try to match out a list of tags of the raw HTML.
+  preg_match_all('!<a class="list name" href=".*">([^<]*)</a></td>!', $result->data, $tags);
+  if(!isset($tags[1])) {
+    watchdog('simplytest_projects', 'Failed to fetch version data for %project (Fetched tags).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+
+  // Fetch branches by request.
+  $result = drupal_http_request($drupalcode_url . '/heads');
+  if (!isset($result->data) || $result->code != 200) {
+    watchdog('simplytest_projects', 'Failed to fetch version data for %project (Requested heads).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  // Try to match out a list of tags of the raw HTML.
+  preg_match_all('!<a class="list name" href=".*">([^<]*)</a></td>!', $result->data, $heads);
+  if(!isset($heads[1])) {
+    watchdog('simplytest_projects', 'Failed to fetch version data for %project (Fetch heads).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+
+  // Blacklist filters.
+  $blacklisted_versions = variable_get('simplytest_projects_blacklisted_versions', array());
+  foreach ($blacklisted_versions as $blacklisted) {
+    foreach ($tags[1] as $key => $tag) {
+      if (preg_match('!' . $blacklisted . '!', $tag)) {
+        unset($tags[1][$key]);
+      }
+    }
+    foreach ($heads[1] as $key => $head) {
+      if (preg_match('!' . $blacklisted . '!', $head)) {
+        unset($heads[1][$key]);
+      }
+    }
+  }
+
+  $versions = array(
+    'tags' => drupal_map_assoc($tags[1]),
+    'heads' => drupal_map_assoc($heads[1]),
+  );
+
+  // Save fresh data to database.
+  $found = db_update('simplytest_projects')
+    ->fields(array(
+      'timestamp' => REQUEST_TIME,
+      'versions' => serialize($versions),
+    ))
+    ->condition('shortname', $project)
+    ->execute();
+
+  watchdog('simplytest_projects', 'Fetched version data for %project.', array(
+    '%project' => $project,
+  ), WATCHDOG_NOTICE);
+
+  return $versions;
+}
+
+/**
+ * Fetches, saves and returns general project information.
+ *
+ * @param string $project
+ *  The project's shortname to fetch information for.
+ *
+ * @return object
+ *  A standard object containing:
+ *   - title: Human readable project title
+ *   - sandbox: Boolean whether it's a sandbox project.
+ *   - type: What the projects type is.
+ *   - creator: The projects creator.
+ */
+function simplytest_projects_fetch_project($project) {
+  // Try as full project.
+  $result = drupal_http_request('http://drupal.org/project/' . $project);
+  $sandbox = FALSE;
+  if ($result->code == 404 && is_numeric($project)) {
+    // Fallback to sandbox project
+    $result = drupal_http_request('http://drupal.org/node/' . $project);
+    $sandbox = TRUE;
+  }
+  if ($result->code != 200 || !isset($result->data)) {
+    watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Request).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+
+  // Try to match out the project title.
+  preg_match_all('!<div class="block-inner">[^<]*<h2>Issues for ([^<]*)</h2>!', $result->data, $title);
+  if(!isset($title[1][0])) {
+    watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Fetch title).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  $title = $title[1][0];
+
+  // Try to match out the project type.
+  preg_match_all('! active[^<]*"><a href="/project/[^<]*" class="[^<]*active">([^<]*)</a></li>!', $result->data, $type);
+  if(isset($type[1][0])) {
+    $type = $type[1][0];
+  }
+  else {
+    watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Fetch type).', array(
+      '%project' => $project,
+    ), WATCHDOG_WARNING);
+    $type = NULL;
+  }
+
+  // Try to match out the creator name.
+  if ($sandbox) {
+    preg_match_all('!<li class="active" ><a href="/sandbox/([^<]*)/' . $project . '" class="active">View</a></li>!', $result->data, $creator);
+    if(!isset($creator[1][0])) {
+      watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Fetch creator).', array(
+        '%project' => $project,
+      ), WATCHDOG_WARNING);
+      return FALSE;
+    }
+    $creator = $creator[1][0];
+  }
+  else {
+    preg_match_all('!<div class="submitted">Posted by <a href="[^<]*" title="View user profile.">([^<]*)</a> on <em>!', $result->data, $creator);
+    if(!isset($creator[1][0])) {
+      watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Fetch creator).', array(
+        '%project' => $project,
+      ), WATCHDOG_WARNING);
+      return FALSE;
+    }
+    $creator = $creator[1][0];
+  }
+
+  // Find out type.
+  switch ($type) {
+    case 'Drupal core':
+      $type = 'Drupal core';
+      break;
+    case 'Modules':
+      $type = 'Module';
+      break;
+    case 'Themes':
+      $type = 'Theme';
+      break;
+    case 'Distributions':
+      $type = 'Distribution';
+      break;
+    default:
+      watchdog('simplytest_projects', 'Failed to fetch initial data for %project (Determine type).', array(
+        '%project' => $project,
+      ), WATCHDOG_WARNING);
+      return FALSE;
+  }
+
+  $data = array(
+    'title' => $title,
+    'shortname' => $project,
+    'sandbox' => (int) $sandbox,
+    'type' => $type,
+    'creator' => $creator,
+  );
+
+  watchdog('simplytest_projects', 'Fetch initial data for %project.', array(
+    '%project' => $project,
+  ), WATCHDOG_NOTICE);
+
+  db_insert('simplytest_projects')
+    ->fields($data)
+    ->execute();
+
+  return $data;
+}
+
+/**
+ * Inserts initial project data into database by a SimpleXML object.
+ */
+function simplytest_projects_xml_insert_project($xml) {
+  // Try to figure out project type by term.
+  if (!isset($xml->terms->term[0]->value)) {
+    return FALSE;
+  }
+  $type_term = (string) $xml->terms->term[0]->value;
+  switch ($type_term) {
+    case 'Drupal core':
+      $type = 'Drupal core';
+      break;
+    case 'Modules':
+      $type = 'Module';
+      break;
+    case 'Themes':
+      $type = 'Theme';
+      break;
+    case 'Distributions':
+      $type = 'Distribution';
+      break;
+    default:
+      return FALSE;
+  }
+
+  db_insert('simplytest_projects')
+    ->fields(array(
+      'title' => (string) $xml->title,
+      'shortname' => (string) $xml->short_name,
+      // Sandbox project?
+      'sandbox' => (int) (is_numeric((string) $xml->short_name) && substr($xml->link, 0, 26) === 'http://drupal.org/sandbox/'),
+      // Get project type, as it is referenced as tag.
+      'type' => $type,
+      // Git creator name (for sandbox projects).
+      'creator' => (string) substr(substr($xml->link, 26), 0, -(strlen($xml->short_name) + 1)),
+    ))
+    ->execute();
+}

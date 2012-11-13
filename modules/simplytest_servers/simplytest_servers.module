@@ -1,0 +1,183 @@
+<?php
+
+/**
+ * @file
+ * Worker server management.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_servers_menu() {
+  $items = array();
+  // Server configuration form.
+  $items['admin/simplytest/servers'] = array(
+    'title' => 'Servers',
+    'description' => 'Server settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simplytest_servers_servers_form'),
+    'access arguments' => array('administer simplytest'),
+    'file' => 'simplytest_servers.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Returns an assocciative array of server information.
+ */
+function simplytest_servers_get() {
+  $servers = db_select('simplytest_servers', 's')
+    ->fields('s', array('id', 'data', 'active', 'slots'))
+    ->execute()->fetchAll(PDO::FETCH_ASSOC);
+  foreach($servers as &$server) {
+    $server = array_merge($server, unserialize($server['data']));
+  }
+  return $servers;
+}
+
+/**
+ * Spawn a submission worker on one of the servers.
+ *
+ * @param array $submission
+ *  An array of submission data.
+ *
+ * @return array
+ *  An associative array of data of the chosen server.
+ */
+function simplytest_servers_spawn($submission) {
+
+  // Decide which server to use.
+  $servers = db_select('simplytest_servers', 's')
+    ->fields('s', array('id', 'data', 'slots'))
+    ->condition('active', (int) TRUE)
+    ->condition('slots', 0, '>')
+    ->orderBy('slots', 'DESC')
+    ->execute()->fetchAll();
+  if (empty($servers)) {
+    watchdog('simplytest_servers', 'Failed to choose servers. No active servers with free slots available.', array(), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  foreach ($servers as $server) {
+    // Update slot count.
+    db_update('simplytest_servers')
+      ->condition('id', $server->id)
+      ->fields(array(
+        'slots' => $server->slots - 1,
+      ))
+      ->execute();
+  
+    $server->data = unserialize($server->data);
+
+    // Format arguments and data for worker script.
+    $args = explode(',', 'id,host,giturl,type,version,timeout,project');
+    $sub = array();
+    foreach ($args as $arg) {
+      if (isset($server->data[$arg])) {
+        $sub[] = escapeshellarg($server->data[$arg]);
+      }
+      if (isset($submission[$arg])) {
+        $sub[] = escapeshellarg($submission[$arg]);
+      }
+    }
+
+    $commands = array(
+      // Spawnscript with arguments.
+      $server->data['spawn'] . ' ' . implode(' ', $sub),
+    );
+
+    // Execute spawn script.
+    if (!simplytest_servers_execute($server, $commands)) {
+      continue;
+    }
+
+    watchdog('simplytest_servers', 'Spawned job on %host by SSH2 with user %user (Server: %name): $%cmd', array(
+      '%host' => $server->data['host'],
+      '%name' => $server->data['name'],
+      '%user' => $server->data['user'],
+      '%cmd' => implode(', ', $commands),
+    ), WATCHDOG_NOTICE);
+    
+    return $server;
+  }
+
+  watchdog('simplytest_servers', 'Failed to spawn a job on any servers.', array(), WATCHDOG_ERROR);
+  return FALSE;
+}
+
+/**
+ * Executes a command on a specific server.
+ *
+ * @param object $server
+ *  A simplytest server object.
+ * @param array $commands
+ *  An array of command string to execute.
+ *
+ * @return bool
+ *  Whether the command could be executed.
+ */
+function simplytest_servers_execute($server, $commands) {
+  // Try to connect to server.
+  $connection = ssh2_connect($server->data['host'], $server->data['port']);
+  if ($connection === FALSE) {
+    watchdog('simplytest_servers', 'Failed to connect to %host by SSH2 (Server: %name).', array(
+      '%host' => $server->data['host'],
+      '%name' => $server->data['name'],
+    ), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Try to  authenticate.
+  if(!ssh2_auth_password($connection, $server->data['user'], $server->data['password'])) {
+    watchdog('simplytest_servers', 'Failed to authenticate to %host by SSH2 with user %user (Server: %name).', array(
+      '%host' => $server->data['host'],
+      '%name' => $server->data['name'],
+      '%user' => $server->data['user'],
+    ), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Try to exec each command.
+  foreach ($commands as $command) {
+    $stream = ssh2_exec($connection, escapeshellcmd($command));
+    if ($stream === FALSE) {
+      watchdog('simplytest_servers', 'Failed to execute command on %host by SSH2 with user %user (Server: %name): $%cmd', array(
+        '%host' => $server->data['host'],
+        '%name' => $server->data['name'],
+        '%user' => $server->data['user'],
+        '%cmd' => $command,
+      ), WATCHDOG_ERROR);
+      return FALSE;
+    }
+    fclose($stream);
+  }
+
+  // Finish connection.
+  $stream = ssh2_exec($connection, 'exit');
+  fclose($stream);
+  $connection = NULL;
+
+  return TRUE;
+}
+
+/**
+ * Implements hook_simplytest_submissions_update().
+ */
+function simplytest_servers_simplytest_submissions_update($id, $state) {
+  // Update server slot count if a submission was terminated.
+  if ($state == SIMPLYTEST_SUBMISSIONS_TERMINATED) {
+    $servers = simplytest_servers_get();
+    $ip_address = ip_address();
+    foreach ($servers as $server) {
+      if ($server['active'] && gethostbyname($server['host']) == $ip_address) {
+        // Update slot count.
+        db_update('simplytest_servers')
+          ->condition('id', $server['id'])
+          ->fields(array(
+            'slots' => $server['slots'] + 1,
+          ))
+          ->execute();
+      }
+    }
+  }
+}

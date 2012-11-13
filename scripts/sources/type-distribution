@@ -1,0 +1,50 @@
+##
+# Setup for distributions.
+#
+# Available globals:
+#  S_ID       Submission id.
+#  S_GITURL   Project git url.
+#  S_TYPE     Project type.
+#  S_VERSION  Project version.
+#  S_PROJECT  Project shortname.
+##
+
+##
+# Download project.
+s_project_download() {
+  # Clone project into the user home temporarily.
+  lg "Fetch distribution project.."
+  rm -rf "/home/$S_ID/www"
+  s_fetch_project "$S_PROJECT" "$S_GITURL" "/home/$S_ID/www"
+
+  # Checkout specified version and remove .git.
+  lg "Set project version.."
+  s_set_version "/home/$S_ID/www" $S_VERSION
+}
+
+##
+# Fetch project dependecies.
+s_project_fetch_dependencies() {
+  # This way to choose a makefile has issues!
+  # @todo Many distribution don't initialize correctly #1836016.
+  # Choose the first make fill it can find.
+  S_MAKEFILE=$(ls -l "/home/$S_ID/www" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
+  if [[ -z "$S_MAKEFILE" ]]; then # Abort if no makefile could be found.
+    lg "Could not find a makefile!"
+    s_ste 8
+  fi
+  lg "-> Chosen makefile: $S_MAKEFILE"
+
+  # Try to build site by make file.
+  cd "/home/$S_ID/www"
+  lg "Building site with makefile.."
+  timeout 350 drush make "$S_MAKEFILE" -y # || s_ste 9
+}
+
+##
+# Install project.
+s_project_install() {
+  # Setup database.
+  lg "Setup database.."
+  s_db_setup $S_ID
+}

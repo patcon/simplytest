@@ -1,0 +1,67 @@
+#logo {
+  display: none;
+}
+#sitename h1 {
+  padding: 4px 0;
+  text-align: center;
+  font-size: 37px;
+}
+#header #site-slogan {
+  text-align: center;
+  font-size: 18px;
+}
+#header-help-flag {
+  display: block;
+  position: relative;
+  margin-top: -185px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 70px;
+  font-size: 20px;
+  top: 105px;
+}
+#header-help-flag a {
+  padding-top: 83px;
+  font-weight: normal;
+}
+#header-help {
+  width: 90%;
+  padding-right: 5%;
+  background-image: none;
+}
+#header-help .content {
+  padding-top: 0;
+  font-size: 15px;
+}
+#simplytest-launch-block-launcher-form #edit-project {
+  width: 80%;
+}
+#homepage-featured {
+  width: 90%;
+  padding-left: 5%;
+  padding-right: 5%;
+}
+#simplytest-launch-block-launcher-form .form-submit {
+  float: none;
+}
+#bottom .column {
+  width: 90% !important;
+  float: none;
+  height: auto;
+  margin-bottom: 23px;
+}
+#footer-bottom {
+  text-align: left;
+  width: 90%;
+  padding-left: 10%;
+}
+#footer-bottom-wrap ul {
+  padding: 0;
+  margin: 0;
+}
+#footer-bottom-wrap li {
+  display: block;
+}
+.ui-autocomplete.ui-menu {
+  width: 80% !important;
+}

@@ -1,0 +1,13 @@
+/* Issue summary block */
+.issue-cockpit-All,
+.issue-cockpit-bug {
+  padding-left: 10px;
+  padding-top: 10px;
+}
+#block-simplytest-issues-simplytest-issues .issue-nav {
+  padding-left: 10px;
+  padding-top: 10px;
+}
+#block-simplytest-issues-simplytest-issues .issue-nav a {
+  display: block;
+}

@@ -1,0 +1,70 @@
+<?php
+
+/**
+ * @file
+ * Provides an issue summary block pulled from drupal.org.
+ */
+
+/**
+ * Implements hook_block_info().
+ */
+function simplytest_issues_block_info() {
+  $blocks = array();
+  $blocks['simplytest_issues'] = array(
+    'info' => t('simplytest issues'),
+    'status' => TRUE,
+    'cache' => DRUPAL_CACHE_CUSTOM,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => "<front>\nproject/*\nproject",
+    'region' => 'footer_first',
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function simplytest_issues_block_view($delta = '') {
+  $block = array();
+  if ($delta == 'simplytest_issues') {
+    $block['subject'] = t('Issues');
+    $block['content'] = t('Drupal.org issues') . simplytest_issues_issues();
+  }
+  return $block;
+}
+
+/**
+ * Requests the issue summary block from drupal.org.
+ */
+function simplytest_issues_issues() {
+  // Check whether we've pulled the data recently.
+  $cached = (@cache_get('simplytest_issues')->data) ?: array('time' => 0, 'text' => '');
+  if ($cached['time'] > strtotime('-3 hours')) {
+    return $cached['text'];
+  }
+
+  // Request fresh data.
+  $result = drupal_http_request('http://drupal.org/project/simplytest');
+  if ($result->code != 200 || !isset($result->data)) {
+    watchdog('simplytest_issues', 'Failed to fetch issues from drupal.org. (HTTP Request failed)', array(), WATCHDOG_ERROR);
+    return $cached['text'];
+  }
+  // Try to match out the issue summary block.
+  preg_match_all('!<div class="issue-cockpit-categories">(.*)</div>[^<]*<div class="issue-cockpit-subscribe">!s', $result->data, $issues);
+  if(!isset($issues[1][0])) {
+    watchdog('simplytest_issues', 'Failed to fetch issues from drupal.org. (PREG MATCH failed)', array(), WATCHDOG_WARNING);
+    return $cached['text'];
+  }
+
+  $text = $issues[1][0];
+  $text = str_replace('/project/issues/', 'http://drupal.org/project/issues/', $text);
+  $text .= '
+    <div class="issue-nav">
+      <a href="http://drupal.org/node/add/project-issue/simplytest">' . t('Open a new issue') . '</a>
+      <a href="http://drupal.org/project/issues/search/simplytest">' . t('Search issues') . '</a>
+    </div>';
+  cache_set('simplytest_issues', array('time' => REQUEST_TIME, 'text' => $text));
+
+  watchdog('simplytest_issues', 'Successfully pulled issue overview.');
+  return $text;
+}

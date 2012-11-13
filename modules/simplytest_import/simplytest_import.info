@@ -1,0 +1,5 @@
+name = simplytest import
+description = Imports project data from XML.
+package = simplytest
+core = 7.x
+dependencies[] = simplytest_projects

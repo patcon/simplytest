@@ -1,0 +1,103 @@
+<?php
+
+/**
+ * @file
+ * Provides managable sponsor blocks and advertisement.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_sponsors_menu() {
+  $items = array();
+  // Sponsor list configuration.
+  $items['admin/simplytest/sponsors'] = array(
+    'title' => 'Sponsors',
+    'page callback' => 'drupal_get_form',
+    'description' => 'Configure sponsoring blocks.',
+    'page arguments' => array('simplytest_sponsors_configuration_form'),
+    'access arguments' => array('administer simplytest'),
+    'file' => 'simplytest_sponsors.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function simplytest_sponsors_theme() {
+  return array(
+    'simplytest_sponsors_configuration_form' => array(
+      'render element' => 'form',
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function simplytest_sponsors_block_info() {
+  $blocks = array();
+  $blocks['simplytest_sponsors_list'] = array(
+    'info' => t('simplytest sponsors - sponsor list'),
+    'status' => TRUE,
+    'cache' => DRUPAL_CACHE_PER_ROLE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => "<front>\nproject/*\nproject",
+    'region' => 'featured',
+    'weight' => 1000,
+  );
+  $blocks['simplytest_sponsors_ad'] = array(
+    'info' => t('simplytest sponsors - advertisement'),
+    'status' => TRUE,
+    'cache' => DRUPAL_NO_CACHE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => "progress/*",
+    'region' => 'footer_first',
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function simplytest_sponsors_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'simplytest_sponsors_list':
+      $block['subject'] = NULL;
+      $block['content'] = simplytest_sponsors_block_list();
+      break;
+    case 'simplytest_sponsors_ad':
+      $block['subject'] = NULL;
+      $block['content'] = simplytest_sponsors_block_ad();
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Prints out a list of sponsor embeds.
+ */
+function simplytest_sponsors_block_list() {
+  $sponsors = variable_get('simplytest_sponsors', array());
+  $items = array();
+  foreach ($sponsors as $sponsor) {
+    $items[] = $sponsor['list_embed'];
+  }
+  return array(
+    '#theme' => 'item_list',
+    '#items' => $items,
+  );
+}
+
+/**
+ * Prints out a random sponsor advertisement.
+ */
+function simplytest_sponsors_block_ad() {
+  $sponsors = variable_get('simplytest_sponsors', array());
+  $sponsor = $sponsors[rand(0, count($sponsors) - 1)];
+  return
+    '<span class="sponsor-ad-embed">' . $sponsor['ad_embed'] . '</span>'
+    . '<span class="sponsor-ad-info">' . t('Sponsor advertisement') . '</span>';
+}

@@ -1,0 +1,8 @@
+name = simplytest submissions
+description = Submissions management
+package = simplytest
+core = 7.x
+
+dependencies[] = simplytest_servers
+dependencies[] = simplytest_projects
+dependencies[] = simplytest_progress

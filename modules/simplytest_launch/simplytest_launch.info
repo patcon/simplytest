@@ -1,0 +1,12 @@
+name = simplytest launch
+description = Submission launcher block of simplytest.me.
+package = simplytest
+core = 7.x
+
+dependencies[] = block
+dependencies[] = simplytest_projects
+dependencies[] = simplytest_submissions
+dependencies[] = simplytest_progress
+
+scripts[] = simplytest_launch.js
+stylesheets[all][] = simplytest_launch.css

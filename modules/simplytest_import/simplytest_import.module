@@ -1,0 +1,101 @@
+<?php
+
+/**
+ * @file
+ * Imports project data from XML.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function simplytest_import_menu() {
+  $items = array();
+  $items['admin/simplytest/import'] = array(
+    'title' => 'Import',
+    'description' => 'Import project data',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simplytest_import_form'),
+    'access arguments' => array('administer simplytest'),
+  );
+  return $items;
+}
+
+/**
+ * Form builder function for the import batch.
+ */
+function simplytest_import_form($form) {
+  $form['pathname'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Path to the file to import project data from'),
+  );
+  $form['count'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Count of projects to import per operation'),
+    '#default_value' => 100,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Start'),
+  );
+  return $form;
+}
+
+/**
+ * Validation handler for building the batch.
+ */
+function simplytest_import_form_validate($form, &$form_state) {
+  if (!file_exists($form_state['values']['pathname'])) {
+    form_set_error('pathname', t('File not found'));
+  }
+  if ((int) $form_state['values']['count'] < 1) {
+    form_set_error('count', t('Count must be integer > 0'));
+  }
+}
+
+/**
+ * Submit handler for building the batch.
+ */
+function simplytest_import_form_submit($form, &$form_state) {
+  // Load the XML file.
+  $xml = simplexml_load_file($form_state['values']['pathname']);
+  $projects = count($xml->project);
+  $count = (int) $form_state['values']['count'];
+
+  $ops = array();
+
+  // Create operations with the specified count of imports.
+  for ($index = 0; $index < $projects; $index += $count) {
+    if (!isset($xml->project[$index])) {
+      break;
+    }
+    $ops[] = array(
+      'simplytest_import_batch_operation',
+      array(range($index, $index + $count - 1), $form_state['values']['pathname']),
+    );
+  }
+
+  // Make sure table is empty.
+  db_truncate('simplytest_projects')->execute();
+
+  watchdog('simplytest_import', 'Started to import XML project file: %file', array('%file' => $form_state['values']['pathname']), WATCHDOG_NOTICE);
+
+  batch_set(array(
+    'operations' => $ops,
+  ));
+}
+
+/**
+ * Batch operation.
+ */
+function simplytest_import_batch_operation($ids, $file, &$context) {
+  $xml = simplexml_load_file($file);
+
+  // Iterate through projects of this round.
+  foreach ($ids as $id) {
+    if (!isset($xml->project[$id])) {
+      break;
+    }
+    // Add each project's initial data.
+    simplytest_projects_xml_insert_project($xml->project[$id]);
+  }
+}
