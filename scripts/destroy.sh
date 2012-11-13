@@ -26,5 +26,5 @@ source "$DIRECTORY/sources/common"
 # Destruct environment.
 s_destruct $S_ID
 
-# Tell the server that a slot has become free.
-s_ste 6
+# Tell the server that a slot has become free (set destruct state).
+wget -qO /dev/null "$S_CALLBACK/$S_ID/6"
