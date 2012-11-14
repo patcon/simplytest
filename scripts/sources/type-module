@@ -57,6 +57,16 @@ s_project_fetch_dependencies() {
   # Resolve dependencies.
   lg "Resolve dependencies"
   s_resolve_dependencies "/home/$S_ID/www" "sites/default"
+
+  # Choose the first make file it can find.
+  S_MAKEFILE=$(ls -l "/home/$S_ID/$S_PROJECT" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
+  if [[ -n "$S_MAKEFILE" ]]; then
+    lg "-> found makefile: $S_MAKEFILE"
+    # Try to execute the makefile (eg. for downloading missing libraries).
+    cd "/home/$S_ID/www/sites/default/modules/$S_PROJECT"
+    lg "Executing makefile.."
+    timeout 350 drush make --force-complete --contrib-destination="sites/default" --no-core "/home/$S_ID/$S_PROJECT/$S_MAKEFILE" -y
+  fi
 }
 
 ##
@@ -69,17 +79,6 @@ s_project_install() {
   # Install drupal in docroot.
   lg "Install drupal core.."
   s_install_drupal $S_CORE $S_CURRENT_CORE
-
-  # Choose the first make fill it can find.
-  # @todo Missing libraries / respect make files #1835884.
-  S_MAKEFILE=$(ls -l "/home/$S_ID/$S_PROJECT" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
-  if [[ -n "$S_MAKEFILE" ]]; then
-    lg "-> found makefile: $S_MAKEFILE"
-    # Try to build site by make file.
-    cd "/home/$S_ID/www"
-    lg "Building site with makefile.."
-    timeout 350 drush make "/home/$S_ID/$S_PROJECT/$S_MAKEFILE" -y
-  fi
 
   # Install the module.
   lg "Install the module project.."
