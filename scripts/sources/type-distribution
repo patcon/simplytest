@@ -96,12 +96,15 @@ s_project_fetch_dependencies() {
 
   # Make sure a site could be build properly.
   if [[ ! -d "/home/$S_ID/www" ]]; then
+    lg "Docroot www directory doesn't exist."
     s_ste 9
   fi
   if [[ -z $(ls "/home/$S_ID/www") ]]; then
+    lg "Docroot is empty."
     s_ste 9
   fi
-  if [[ ! -d "/home/$S_ID/www/includes" ]]; then
+  if [[ ! -r "/home/$S_ID/www/index.php" ]]; then
+    lg "No index.php found in docroot."
     s_ste 9
   fi
 }
