@@ -14,31 +14,96 @@
 s_project_download() {
   # Clone project into the user home temporarily.
   lg "Fetch distribution project.."
-  rm -rf "/home/$S_ID/www"
-  s_fetch_project "$S_PROJECT" "$S_GITURL" "/home/$S_ID/www"
+  s_fetch_project "$S_PROJECT" "$S_GITURL" "/home/$S_ID/$S_PROJECT"
 
   # Checkout specified version and remove .git.
   lg "Set project version.."
-  s_set_version "/home/$S_ID/www" $S_VERSION
+  s_set_version "/home/$S_ID/$S_PROJECT" $S_VERSION
+
+  # Try to discover the main info file.
+  S_INFO_FILE=$(s_discover_info_file "/home/$S_ID/$S_PROJECT")
+  lg "-> discovered info file: $S_INFO_FILE"
+
+  # Find out needed major core version.
+  lg "Finding out needed major core version"
+  S_CORE=$(s_get_project_coreversion "$S_INFO_FILE")
+  lg "-> major core version: $S_CORE"
 }
 
 ##
 # Fetch project dependecies.
 s_project_fetch_dependencies() {
-  # This way to choose a makefile has issues!
-  # @todo Many distribution don't initialize correctly #1836016.
-  # Choose the first make fill it can find.
-  S_MAKEFILE=$(ls -l "/home/$S_ID/www" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
-  if [[ -z "$S_MAKEFILE" ]]; then # Abort if no makefile could be found.
-    lg "Could not find a makefile!"
-    s_ste 8
-  fi
-  lg "-> Chosen makefile: $S_MAKEFILE"
 
-  # Try to build site by make file.
-  cd "/home/$S_ID/www"
-  lg "Building site with makefile.."
-  timeout 350 drush make "$S_MAKEFILE" -y # || s_ste 9
+  # We'll directly clone it into the www directory, so delete it for git.
+  rm -rf "/home/$S_ID/www"
+
+  # Check for build-*.make file (needed below).
+  local build_make=$(ls -l "/home/$S_ID/$S_PROJECT" | grep -m 1 -o "build-*[_a-zA-Z0-9]*.make$")
+
+  # Choose makefile.
+  # simplytest.make ?
+  if [[ -e "/home/$S_ID/$S_PROJECT/simplytest.make" ]]; then
+    lg "-> Chosen makefile: simplytest.make"
+    # Build site by makefile.
+    timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/simplytest.make" "/home/$S_ID/www" -y
+
+  # build-*.make ?
+  elif [[ -n $build_make ]]; then
+    lg "-> Chosen makefile: $build_make"
+    # Build site by makefile.
+    timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/$build_make" "/home/$S_ID/www" -y
+
+  # drupal-org-core.make ?
+  elif [[ -e "/home/$S_ID/$S_PROJECT/drupal-org-core.make" ]]; then
+    lg "-> Chosen makefile: drupal-org-core.make"
+    # If there's also a drupal-org.make file use it to resolve dependencies.
+    if [[ -e "/home/$S_ID/$S_PROJECT/drupal-org.make" ]]; then
+      echo "includes[] = drupal-org.make" >> "/home/$S_ID/$S_PROJECT/drupal-org-core.make"
+    fi
+    # Build site by makefile.
+    timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/drupal-org-core.make" "/home/$S_ID/www" -y
+    # Move files to profiles folder.
+    cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
+    # If no drupal-org.make file is available resolve dependencies manually.
+    if [[ ! -e "/home/$S_ID/$S_PROJECT/drupal-org.make" ]]; then
+      # Resolve missing dependencies.
+      s_resolve_dependencies "/home/$S_ID/www" "profiles/$S_PROJECT"
+    fi
+
+  # drupal-org.make ?
+  elif [[ -e "/home/$S_ID/$S_PROJECT/drupal-org.make" ]]; then
+    lg "-> Chosen makefile: drupal-org.make"
+    # Make sure makefile is usable.
+    echo "api = 2
+      core = $S_CORE.x
+      projects[drupal][type] = core" >> "/home/$S_ID/$S_PROJECT/drupal-org.make"
+    # Build site by makefile.
+    timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/drupal-org.make" "/home/$S_ID/www" -y
+    # Move files to profiles folder.
+    cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
+
+  # No matching makefile ?
+  else
+    lg "Could not select any makefile."
+    # Fetch drupal core. We'll directly clone it into the www directory, so delete it for git.
+    rm -rf "/home/$S_ID/www"
+    timeout 500 drush dl --destination="/home/$S_ID" --drupal-project-rename="www" --default-major="$S_CORE" "drupal-$S_CORE"
+    # Move files to profiles folder.
+    cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
+    # Resolve missing dependencies.
+    s_resolve_dependencies "/home/$S_ID/www" "profiles/$S_PROJECT"
+  fi
+
+  # Make sure a site could be build properly.
+  if [[ ! -d "/home/$S_ID/www" ]]; then
+    s_ste 9
+  fi
+  if [[ -z $(ls "/home/$S_ID/www") ]]; then
+    s_ste 9
+  fi
+  if [[ ! -d "/home/$S_ID/www/includes" ]]; then
+    s_ste 9
+  fi
 }
 
 ##
