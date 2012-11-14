@@ -82,7 +82,7 @@ s_fetch_project() {
 # @param $1
 #  SQL query to execute.
 s_sqlquery() {
- mysql -u $S_SQLUSR "-p$S_SQLPWD" -e "$1" || s_ste 10
+  mysql -u $S_SQLUSR "-p$S_SQLPWD" -e "$1" || s_ste 10
 }
 
 ##
@@ -409,15 +409,15 @@ s_addsnippet() {
 # @todo Modules have no versions #1833544.
 #
 # @param 1
-#  Drupal root path.
+#  Root path, for searching resolved dependencies in.
 # @param 2
-#  Current subpath within the root path.
+#  Path to resolve dependencies for.
 #
 # For this function we need some static dependency container:
-declare -A __DEPENDENCIES
+declare -A __RESOLVED_DEPENDENCIES
 #
 s_resolve_dependencies() {
-  cd "$1/$2"
+  cd "$2"
   # Find all info files within the path.
   local info_files=$(find . -name '*.info')
   for info_file in $info_files; do
@@ -426,36 +426,34 @@ s_resolve_dependencies() {
 $(s_info_file_get "$info_file" "base theme")"
     # Iterate through all dependencies.
     for cur_dependency in $cur_dependencies; do
-      # 1. Make sure it's not empty, 2. Make sure it's not resolved yet, 3. Remove version conditions.
-      if [[ -n $cur_dependency && -z ${__DEPENDENCIES[$cur_dependency]} && ${cur_dependency:0:1} != '(' ]]; then
+      # 1. Make sure it's not empty, 2. Make sure it's not resolved yet, 3. Version definitions aren't modules.
+      if [[ -n $cur_dependency && -z ${__RESOLVED_DEPENDENCIES[$cur_dependency]} && ${cur_dependency:0:1} != '(' ]]; then
         cd "$1"
         lg "$(basename $info_file) depends on \"$cur_dependency\""
         # Mark current dependency as resolved.
-        __DEPENDENCIES[$cur_dependency]="1"
-        # Dependency is not already resolved (but not indexed yet)? (prevent infinite recursion).
+        __RESOLVED_DEPENDENCIES[$cur_dependency]="1"
+        # Dependency is not already resolved? (prevent infinite recursion).
         if [[ -z $(find . -name "$cur_dependency.info") ]]; then
+          local cur_real_dependency=$cur_dependency
           # Try to resolve dependency by project alias list (eg. content -> cck).
           if [[ -n ${__PROJECT_ALIASES[$cur_dependency]} ]]; then
-            MODULE_cur_dependency=$cur_dependency
             cur_dependency=${__PROJECT_ALIASES[$cur_dependency]}
           fi
-          # If that failed (unfortunately drush dl always returns success) and the dependency is
-          # still missing, try to guess and download the main module.
+          local result=$(timeout 350 drush dl --pipe -y $cur_dependency)
+          # If that failed, the dependency is still missing, try to guess and download the main module.
           # eg. entity_token -> doesn't exist ----> entity|_token -----> entity -> does exist!
-          timeout 350 drush dl -y $cur_dependency
-          # @todo find cleaner way to check this, without hardcoded paths.
-          if [[ ( ! -d "sites/default/modules/$cur_dependency" && ! -d "sites/default/themes/$cur_dependency" )
-             || ( ! -d "sites/default/modules/$MODULE_cur_dependency" && ! -d "sites/default/modules/$MODULE_cur_dependency" ) ]]; then
+          if [[ -z "$result" ]]; then
             cur_dependency=${cur_dependency%_*}
-            timeout 350 drush dl -y $cur_dependency
+            local result=$(timeout 350 drush dl --pipe -y $cur_dependency)
           fi
-          # Resolve dependencies of the dependency (recursion).
-          if [[ -d "sites/default/modules/$cur_dependency" || -d "sites/default/themes/$cur_dependency" ]]; then
-            s_resolve_dependencies "$1" "/sites/default/modules/$cur_dependency"
+          # If that succeeded, resolve dependencies of the dependency (recursion).
+          if [[ -n "$result" ]]; then
+            lg "-> Successfully resolved $cur_real_dependency (Project: $cur_dependency)."
+            s_resolve_dependencies "$1" $(dirname $(find "$1" -name "$cur_real_dependency.info" | sort | head -n 1))
           fi
         fi
         # Back to root dir.
-        cd "$1/$2"
+        cd "$2"
       fi
     done
   done

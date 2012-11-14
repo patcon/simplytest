@@ -54,7 +54,7 @@ s_project_fetch_dependencies() {
 
   # Resolve dependencies.
   lg "Resolve dependencies"
-  s_resolve_dependencies "/home/$S_ID/www" "sites/default"
+  s_resolve_dependencies "/home/$S_ID/www" "/home/$S_ID/www/sites/default"
 }
 
 ##

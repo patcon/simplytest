@@ -67,7 +67,7 @@ s_project_fetch_dependencies() {
     # If no drupal-org.make file is available resolve dependencies manually.
     if [[ ! -e "/home/$S_ID/$S_PROJECT/drupal-org.make" ]]; then
       # Resolve missing dependencies.
-      s_resolve_dependencies "/home/$S_ID/www" "profiles/$S_PROJECT"
+      s_resolve_dependencies "/home/$S_ID/www" "/home/$S_ID/www/profiles/$S_PROJECT"
     fi
 
   # drupal-org.make ?
@@ -91,7 +91,7 @@ s_project_fetch_dependencies() {
     # Move files to profiles folder.
     cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
     # Resolve missing dependencies.
-    s_resolve_dependencies "/home/$S_ID/www" "profiles/$S_PROJECT"
+    s_resolve_dependencies "/home/$S_ID/www" "/home/$S_ID/www/profiles/$S_PROJECT"
   fi
 
   # Make sure a site could be build properly.

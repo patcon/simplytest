@@ -17,6 +17,7 @@ S_DMAIL_SUFFIX="@simplytest.me"
 S_DRUSHCACHE="/home/spawner/.drush/cache/git"
 
 # List of project aliases.
+# [Dependency name]= Project name
 declare -A __PROJECT_ALIASES
 __PROJECT_ALIASES[content]=cck
 __PROJECT_ALIASES[services_historical]=services_tools
@@ -25,3 +26,4 @@ __PROJECT_ALIASES[googleanalytics]=google_analytics
 __PROJECT_ALIASES[actions_permissions]=views_bulk_operations
 __PROJECT_ALIASES[node_reference]=references
 __PROJECT_ALIASES[user_reference]=references
+__PROJECT_ALIASES[oauth_common]=oauth

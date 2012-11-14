@@ -56,7 +56,7 @@ s_project_fetch_dependencies() {
 
   # Resolve dependencies.
   lg "Resolve dependencies"
-  s_resolve_dependencies "/home/$S_ID/www" "sites/default"
+  s_resolve_dependencies "/home/$S_ID/www" "/home/$S_ID/www/sites/default"
 
   # Choose the first make file it can find.
   S_MAKEFILE=$(ls -l "/home/$S_ID/$S_PROJECT" | grep -m 1 -o "[-_a-zA-Z0-9]*.make")
