@@ -59,10 +59,16 @@ function simplytest_permission() {
   // General permissions.
   return array(
     'access simplytest page' => array(
-      'title' => t('Access simplytest home page'), 
+      'title' => t('Access simplytest home page'),
     ),
     'administer simplytest' => array(
-      'title' => t('Administer simplytest'), 
+      'title' => t('Administer simplytest'),
+    ),
+    'submit simplytest requests' => array(
+      'title' => t('Submit simplytest requests'),
+    ),
+    'bypass antiflood' => array(
+      'title' => t('Bypass anti-flood mechanisms'),
     ),
   );
 }
