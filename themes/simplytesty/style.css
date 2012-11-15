@@ -202,6 +202,10 @@ h4 a {
   color: #000;
 }
 
+h1.page-title {
+  margin-top: 15px;
+}
+
 img, img a {
   border: 0;
 }
@@ -291,6 +295,10 @@ table ul.links {
 table ul.links li {
   padding: 0 1em 0 0;
 }
+table caption {
+  font-size: 1.5em;
+  margin-bottom: 10px;
+}
 
 #wrap {
   width: 100%;
@@ -307,6 +315,7 @@ table ul.links li {
   -webkit-border-radius: 5px;
   -moz-border-radius: 5px;
   border-radius: 5px;
+  margin-bottom: 50px;
 }
 
 #page-top {
@@ -1434,7 +1443,7 @@ h3.comment-title a{
 
 /* custom */
 
-.column.D iframe {
+.column.D .widgets iframe {
   width: 130px !important;
 }
 
@@ -1444,6 +1453,7 @@ iframe.twitter-follow-button {
   height: 20px;
   background: url(images/bg-tweet-bubble.png) no-repeat 12px top;
   margin-top: -1px;
+  width: 140px !important;
 }
 
 div.tweet {
