@@ -1,0 +1,56 @@
+/* Highlight some rows of the simplytest submission monitor table */
+
+.simplytest-submissions-enqueued.even {
+  background: #b9e1ee;
+}
+.simplytest-submissions-enqueued.odd {
+  background: #b0d3df;
+}
+
+.simplytest-submissions-downloading.even,
+.simplytest-submissions-installing.even,
+.simplytest-submissions-finalizing.even,
+.simplytest-submissions-preparing.even {
+  background: #f1f58d;
+}
+.simplytest-submissions-downloading.odd,
+.simplytest-submissions-installing.odd,
+.simplytest-submissions-finalizing.odd,
+.simplytest-submissions-preparing.odd {
+  background: #f5f8aa;
+}
+
+.simplytest-submissions-finished.even {
+  background: #bfeeb8;
+}
+.simplytest-submissions-finished.odd {
+  background: #b7dfb2;
+}
+
+.simplytest-submissions-error-aborted.even {
+  background: #f3e1e1;
+}
+.simplytest-submissions-error-aborted.odd {
+  background: #f7e7e7;
+}
+
+.simplytest-submissions-error-download.even,
+.simplytest-submissions-error-installing.even,
+.simplytest-submissions-error-prepare.even,
+.simplytest-submissions-error-server.even {
+  background: #eeb9b9;
+}
+
+.simplytest-submissions-error-download.odd,
+.simplytest-submissions-error-installing.odd,
+.simplytest-submissions-error-prepare.odd,
+.simplytest-submissions-error-server.odd {
+  background: #ecd4d4;
+}
+
+.simplytest-submissions-terminated {
+  color: gray;
+}
+.simplytest-submissions-terminated a {
+  color: gray;
+}

@@ -88,10 +88,10 @@ function simplytest_submissions_config_form($form = array()) {
  */
 function simplytest_submissions_monitor_table() {
   $submissions = db_select('simplytest_submissions', 'p')
-    ->orderBy('number', 'DESC')
     ->fields('p', array('id', 'state', 'ip', 'timestamp', 'data'))
     ->extend('PagerDefault')
     ->limit(50)
+    ->orderBy('number', 'DESC')
     ->execute()->fetchAll(PDO::FETCH_ASSOC);
   $rows = array();
   foreach ($submissions as &$submission) {
@@ -103,19 +103,25 @@ function simplytest_submissions_monitor_table() {
       ? 'http://drupal.org/sandbox/' . $submission['creator'] . '/' . $submission['project']
       : 'http://drupal.org/project/' . $submission['project']
     );
+    $state_text = _simplytest_submissions_state_to_string($submission['state']);
     $rows[] = array(
-      l($submission['id'], 'goto/' . $submission['id']),
-      _simplytest_submissions_state_to_string($submission['state']),
-      check_plain($submission['ip']),
-      format_date($submission['timestamp']),
-      l(format_string('!title (!version)', array(
-        '!title' => $submission['title'],
-        '!version' => $submission['version'],
-        )), $project_url),
-      check_plain($submission['type']),
-      ($submission['state'] != SIMPLYTEST_SUBMISSIONS_TERMINATED)
-        ? l(t('Terminate'), 'admin/simplytest/monitor/operation/terminate/' . $submission['id'])
-        : '',
+      // Cells.
+      'data' => array(
+        l($submission['id'], 'goto/' . $submission['id']),
+        $state_text,
+        check_plain($submission['ip']),
+        format_date($submission['timestamp']),
+        l(format_string('!title (!version)', array(
+          '!title' => $submission['title'],
+          '!version' => $submission['version'],
+          )), $project_url),
+        check_plain($submission['type']),
+        ($submission['state'] != SIMPLYTEST_SUBMISSIONS_TERMINATED)
+          ? l(t('Terminate'), 'admin/simplytest/monitor/operation/terminate/' . $submission['id'])
+          : '',
+        ),
+      // Attributes for tr.
+      'class' => array(drupal_html_class('simplytest-submissions-' . $state_text)),
     );
   }
 
@@ -133,6 +139,11 @@ function simplytest_submissions_monitor_table() {
     ),
     '#rows' => $rows,
     '#empty' => t('No recent submissions.'),
+    '#attached' => array(
+      'css' => array(
+        drupal_get_path('module', 'simplytest_submissions') . '/simplytest_submissions.css',
+      ),
+    ),
   );
   $build['pager'] = array('#theme' => 'pager');
   return $build;
