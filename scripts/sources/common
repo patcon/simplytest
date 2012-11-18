@@ -403,14 +403,26 @@ s_addsnippet() {
 }
 
 ##
+# Reads all dependencies out of the specified .info file
+#
+# @param $1
+#  Info file to read dependencies of.
+s_read_dependencies() {
+  s_info_file_get_all "$1" "dependencies"
+  s_info_file_get_all "$1" "test_dependencies"
+  s_info_file_get_all "$1" "simplytest_dependencies"
+  s_info_file_get "$1" "base theme"
+}
+
+##
 # Resolves all dependencies within the given path.
 #
 # @todo Version specific dependencies not fetched #1836012.
 # @todo Modules have no versions #1833544.
 #
-# @param 1
+# @param $1
 #  Root path, for searching resolved dependencies in.
-# @param 2
+# @param $2
 #  Path to resolve dependencies for.
 #
 # For this function we need some static dependency container:
@@ -422,8 +434,7 @@ s_resolve_dependencies() {
   local info_files=$(find . -name '*.info')
   for info_file in $info_files; do
     # Read out dependencies (dependencies = "", base theme = "").
-    local cur_dependencies="$(s_info_file_get_all "$info_file" "dependencies")
-$(s_info_file_get "$info_file" "base theme")"
+    local cur_dependencies=$(s_read_dependencies "$info_file")
     # Iterate through all dependencies.
     for cur_dependency in $cur_dependencies; do
       # 1. Make sure it's not empty, 2. Make sure it's not resolved yet, 3. Version definitions aren't modules.
