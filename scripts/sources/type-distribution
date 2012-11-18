@@ -46,12 +46,20 @@ s_project_fetch_dependencies() {
     lg "-> Chosen makefile: simplytest.make"
     # Build site by makefile.
     timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/simplytest.make" "/home/$S_ID/www" -y
+    # Make sure the profile is available.
+    if [[ ! -d "/home/$S_ID/www/profiles/$S_PROJECT" ]]; then
+      cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
+    fi
 
   # build-*.make ?
   elif [[ -n $build_make ]]; then
     lg "-> Chosen makefile: $build_make"
     # Build site by makefile.
     timeout 500 drush make --force-complete "/home/$S_ID/$S_PROJECT/$build_make" "/home/$S_ID/www" -y
+    # Make sure the profile is available.
+    if [[ ! -d "/home/$S_ID/www/profiles/$S_PROJECT" ]]; then
+      cp -rf "/home/$S_ID/$S_PROJECT" "/home/$S_ID/www/profiles"
+    fi
 
   # drupal-org-core.make ?
   elif [[ -e "/home/$S_ID/$S_PROJECT/drupal-org-core.make" ]]; then
