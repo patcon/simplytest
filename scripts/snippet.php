@@ -8,8 +8,9 @@ register_shutdown_function(function() {
     // Make sure the returned content is also text/html.
     $headers = headers_list();
     foreach ($headers as $header) {
-      if (strstr($header, 'Content-Type:') !== FALSE) {
-        if (strstr($header, 'Content-Type: text/html') !== FALSE) {
+      $header = strtolower($header);
+      if (strstr($header, 'content-type:') !== FALSE) {
+        if (strstr($header, 'content-type: text/html') !== FALSE) {
           // Everything is fine, print the snippet.
           // Print infobar.
           _simplytest_snippet_infobar($simplytest_snippet);
