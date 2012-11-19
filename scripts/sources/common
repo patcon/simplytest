@@ -447,12 +447,12 @@ s_resolve_dependencies() {
           if [[ -n ${__PROJECT_ALIASES[$cur_dependency]} ]]; then
             cur_dependency=${__PROJECT_ALIASES[$cur_dependency]}
           fi
-          local result=$(timeout 350 drush dl --pipe -y $cur_dependency)
+          local result=$(timeout 350 drush dl --gitinfofile --pipe -y $cur_dependency)
           # If that failed, the dependency is still missing, try to guess and download the main module.
           # eg. entity_token -> doesn't exist ----> entity|_token -----> entity -> does exist!
           if [[ -z "$result" ]]; then
             cur_dependency=${cur_dependency%_*}
-            local result=$(timeout 350 drush dl --pipe -y $cur_dependency)
+            local result=$(timeout 350 drush dl --gitinfofile --pipe -y $cur_dependency)
           fi
           # If that succeeded, resolve dependencies of the dependency (recursion).
           if [[ -n "$result" ]]; then
