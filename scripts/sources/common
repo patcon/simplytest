@@ -463,6 +463,7 @@ s_resolve_dependencies() {
         # Dependency is not already resolved? (prevent infinite recursion).
         if [[ -z $(find . -name "$cur_dependency.info") ]]; then
           local cur_real_dependency=$cur_dependency
+          local cur_recursive_dependency=$cur_dependency
           # Try to resolve dependency by project alias list (eg. content -> cck).
           if [[ -n ${__PROJECT_ALIASES[$cur_dependency]} ]]; then
             cur_dependency=${__PROJECT_ALIASES[$cur_dependency]}
@@ -472,12 +473,13 @@ s_resolve_dependencies() {
           # eg. entity_token -> doesn't exist ----> entity|_token -----> entity -> does exist!
           if [[ -z "$result" ]]; then
             cur_dependency=${cur_dependency%_*}
+            local cur_recursive_dependency=$cur_dependency
             local result=$(timeout 350 drush dl --gitinfofile --pipe -y $cur_dependency)
           fi
           # If that succeeded, resolve dependencies of the dependency (recursion).
           if [[ -n "$result" ]]; then
             lg "-> Successfully resolved $cur_real_dependency (Project: $cur_dependency)."
-            s_resolve_dependencies "$1" $(dirname $(find "$1" -name "$cur_real_dependency.info" | sort | head -n 1))
+            s_resolve_dependencies "$1" $(dirname $(find "$1" -name "$cur_recursive_dependency.info" | sort | head -n 1))
           fi
         fi
         # Back to root dir.
