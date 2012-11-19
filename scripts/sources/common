@@ -400,6 +400,26 @@ s_addsnippet() {
 }
 
 ##
+# Rewrites all .info files in the specified directory.
+#
+# @param $1
+#  Directory to rewrite all .info files from.
+# @param $2
+#  Version value to insert.
+# @param $3
+#  Project value to insert.
+s_rewrite_info_files() {
+  # Find all info files within the path.
+  local info_files=$(find "$1" -name '*.info')
+  for info_file in $info_files; do
+    echo "; Information added by simplytest.me build script
+version = \"$2\"
+project = \"$3\"
+" >> "$info_file"
+  done
+}
+
+##
 # Reads all dependencies out of the specified .info file
 #
 # @param $1

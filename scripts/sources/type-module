@@ -20,6 +20,9 @@ s_project_download() {
   lg "Set project version.."
   s_set_version "/home/$S_ID/$S_PROJECT" $S_VERSION
 
+  # Rewrite all info files to add version and project value.
+  s_rewrite_info_files "/home/$S_ID/$S_PROJECT" $S_VERSION $S_PROJECT
+
   # Try to find out "real" project filename (eg, shortname: cck -> filename: content).
   lg "Finding out real project (file) name.."
   S_PROJECT_FILE=$(s_get_project_filename "/home/$S_ID/$S_PROJECT")
