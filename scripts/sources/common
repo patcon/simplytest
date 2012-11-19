@@ -397,9 +397,6 @@ s_addsnippet() {
     );
     ?>" >> "/home/$S_ID/www/snippet.php"
   cat "$DIRECTORY/snippet.php" >> "/home/$S_ID/www/snippet.php"
-  if [[ $S_CORE == "8" ]]; then
-    echo "_simplytest_snippet_infobar(\$simplytest_snippet);" >> "/home/$S_ID/www/index.php"
-  fi
 }
 
 ##
