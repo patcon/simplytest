@@ -435,7 +435,6 @@ s_read_dependencies() {
 # Resolves all dependencies within the given path.
 #
 # @todo Version specific dependencies not fetched #1836012.
-# @todo Modules have no versions #1833544.
 #
 # @param $1
 #  Root path, for searching resolved dependencies in.
