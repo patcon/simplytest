@@ -143,7 +143,7 @@ function simplytest_launch_block_launcher_form($form = array()) {
     '#disabled' => !$enabled,
   );
 
-  $form['submit'] = array(
+  $form['launch'] = array(
     '#type' => 'submit',
     '#default_value' => t('Launch sandbox'),
     '#disabled' => !$enabled,
