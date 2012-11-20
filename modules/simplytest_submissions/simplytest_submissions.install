@@ -60,7 +60,7 @@ function simplytest_submissions_schema() {
     'indexes' => array(
       'state' => array('state'),
     ),
-    'primary key' => array('id'),
+    'primary key' => array('number', 'id'),
   );
   return $schema;
 }

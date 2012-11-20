@@ -39,7 +39,7 @@ function simplytest_servers_schema() {
         'default' => 0,
       ),
     ),
-    'primary key' => array('number', 'id'),
+    'primary key' => array('id'),
   );
   return $schema;
 }
