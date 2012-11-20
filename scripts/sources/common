@@ -22,7 +22,7 @@ s_info_file_get() {
   # Make sure info files are unix encoded before reading them.
   dos2unix -q "$1"
   # Cut out the value.
-  grep -m 1 "$2" "$1" | sed 's/^ *//g' | sed -n "s/$2[^=]*=[ ]*//p" | sed "s/[\"|\']//g"
+  grep -m 1 "$2[ ]*=" "$1" | sed 's/^ *//g' | sed -n "s/$2[^=]*=[ ]*//p" | sed "s/[\"|\']//g"
 }
 
 ##
@@ -36,7 +36,7 @@ s_info_file_get_all() {
   # Make sure info files are unix encoded before reading them.
   dos2unix -q "$1"
   # Cut out the values.
-  cat "$1" | grep "$2" | sed 's/^ *//g' | sed -n "s/$2[^=]*=[ ]*//p" | sed "s/[\"|\']//g"
+  cat "$1" | grep "$2\[\][ ]*" | sed 's/^ *//g' | sed -n "s/$2[^=]*=[ ]*//p" | sed "s/[\"|\']//g"
 }
 
 ##
