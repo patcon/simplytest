@@ -209,7 +209,7 @@ function simplytest_submissions_enqueue($project, $version) {
 
   // Collect submission data.
   $data['version'] = $version;
-  $data['project'] = $project;
+  $data['project'] = strtolower($project);
   $data['timeout'] = variable_get('simplytest_submissions_timeout', 15);
   foreach ($user->roles as $rid => $role) {
     // Select highest timeout setting.

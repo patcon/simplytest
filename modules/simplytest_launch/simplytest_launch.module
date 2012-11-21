@@ -107,7 +107,7 @@ function simplytest_launch_block_launcher_form($form = array()) {
   // Although I don't like using arg() we got no choise here as
   // this form will be rendered within a block.
   if (arg(0) === 'project') {
-    $project = trim(arg(1));
+    $project = strtolower(trim(arg(1)));
     $version = trim(arg(2));
     if (!empty($project)) {
       $versions = simplytest_launch_project_versions_options($project);
@@ -155,7 +155,7 @@ function simplytest_launch_block_launcher_form($form = array()) {
  * The launcher block form submit handler.
  */
 function simplytest_launch_block_launcher_form_submit(&$form, &$form_state) {
-  $project = trim($form_state['values']['project']);
+  $project = strtolower(trim($form_state['values']['project']));
   $version = $form_state['values']['version'];
 
   // Flood protection check.
