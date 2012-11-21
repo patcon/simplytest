@@ -65,3 +65,8 @@
 .ui-autocomplete.ui-menu {
   width: 80% !important;
 }
+#simplytest-launch-block-launcher-form .dropbutton-wrapper {
+  display: block;
+  float: none;
+  padding-right: 0;
+}
