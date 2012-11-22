@@ -1,0 +1,21 @@
+language: php
+
+php:
+  - 5.4
+
+env:
+  global:
+    - PROJECT_NAME=simplytest
+    - SELENIUM_VERSION=2.26.0
+    - CASPERJS_VERSION=0.6.10
+    - WORKSPACE=$HOME/builds/myplanetdigital
+    - PHANTOMJS_EXECUTABLE='phantomjs --local-to-remote-url-access=yes --ignore-ssl-errors=yes'
+  matrix:
+    - DRUSH_VERSION=5.4.0
+    - DRUSH_VERSION=5.7.0
+
+before_install: bash tmp/scripts/travis_before_install.sh
+
+before_script:  bash tmp/scripts/travis_install.sh
+
+script:         bash tmp/scripts/travis_test.sh
