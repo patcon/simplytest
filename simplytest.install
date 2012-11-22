@@ -86,3 +86,36 @@ function simplytest_install() {
   // Set default site slogan.
   variable_set('site_slogan', t('Evaluate Drupal projects online'));
 }
+
+/**
+ * Implements hook_install_tasks().
+ *
+ * @TODO: Add the Import interface for users installing via the UI to choose how
+ * they want to supply the projects data.
+ */
+function simplytest_install_tasks() {
+  $file = drupal_get_path('module', 'simplytest') . '/libraries/simplytest_import/projects.xml';
+  if (file_exists($file)) {
+    $tasks['simplytest_import'] = array(
+      'display_name' => st('Import projects'),
+      'type' => 'batch',
+    );
+  }
+
+  return $tasks;
+}
+
+/**
+ * Task callback: return a batch API array with the projects to be imported.
+ */
+function simplytest_import() {
+  $file = drupal_get_path('module', 'simplytest') . '/libraries/simplytest_import/projects.xml';
+
+  $batch = array(
+    'title' => t('Importing projects'),
+    'operations' => array(array('simplytest_import_batch_operation_process_xml', array($file))),
+    'file' => drupal_get_path('module', 'simplytest_import') . '/simplytest_import.module',
+  );
+
+  return $batch;
+}

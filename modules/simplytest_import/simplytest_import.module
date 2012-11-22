@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Imports project data from XML.
@@ -10,6 +9,7 @@
  */
 function simplytest_import_menu() {
   $items = array();
+
   $items['admin/simplytest/import'] = array(
     'title' => 'Import',
     'description' => 'Import project data',
@@ -17,6 +17,7 @@ function simplytest_import_menu() {
     'page arguments' => array('simplytest_import_form'),
     'access arguments' => array('administer simplytest'),
   );
+
   return $items;
 }
 
@@ -24,29 +25,113 @@ function simplytest_import_menu() {
  * Form builder function for the import batch.
  */
 function simplytest_import_form($form) {
-  $form['pathname'] = array(
+  $defaults = variable_get('simplytest_import', array(
+    'method' => 'path',
+    'path' => '',
+    'count' => 100,
+  ));
+
+  $form['method'] = array(
+    '#type' => 'radios',
+    '#title' => t('Method'),
+    '#options' => array(
+      'path' => t('Path to file'),
+      'upload' => t('Upload'),
+      'download' => t('Automatic download <em>(expirimental)</em>'),
+    ),
+    '#default_value' => $defaults['method'],
+    '#after_build' => array('simplytest_import_dependencies_curl'),
+  );
+
+  $form['path'] = array(
     '#type' => 'textfield',
     '#title' => t('Path to the file to import project data from'),
+    '#default_value' => $defaults['path'],
+    '#states' => array(
+      'visible' => array(
+        ':input[name="method"]' => array('value' => 'path'),
+      ),
+    ),
   );
+
+  $form['upload'] = array(
+    '#type' => 'file',
+    '#title' => t('Upload'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name="method"]' => array('value' => 'upload'),
+      ),
+    ),
+  );
+
   $form['count'] = array(
     '#type' => 'textfield',
     '#title' => t('Count of projects to import per operation'),
-    '#default_value' => 100,
+    '#default_value' => $defaults['count'],
   );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Start'),
   );
+
   return $form;
+}
+
+/**
+ * After build callback; Check if cURL is available.
+ */
+function simplytest_import_dependencies_curl($element) {
+  if (!is_callable('curl_init')) {
+    $element['download']['#attributes']['disabled'] = TRUE;
+    $element['download']['#title'] = t('Automatic download <em>(Requires <a href="@url">cURL</a>)</em>', array('@url' => 'http://php.net/manual/en/book.curl.php'));
+  }
+  return $element;
 }
 
 /**
  * Validation handler for building the batch.
  */
 function simplytest_import_form_validate($form, &$form_state) {
-  if (!file_exists($form_state['values']['pathname'])) {
-    form_set_error('pathname', t('File not found'));
+  switch ($form_state['values']['method']) {
+    case 'path':
+      if (!file_exists($form_state['values']['path'])) {
+        form_set_error('path', t('File not found'));
+      }
+      break;
+
+    case 'upload':
+      $file = new stdClass();
+      $file->filename = $_FILES['files']['name']['upload'];
+      $errors = file_validate_extensions($file, 'xml');
+
+      // Check for validation errors.
+      if (!empty($errors)) {
+        $message = t('The specified file %name could not be uploaded.', array('%name' => $file->filename));
+        if (count($errors) > 1) {
+          $message .= theme('item_list', array('items' => $errors));
+        }
+        else {
+          $message .= ' ' . array_pop($errors);
+        }
+        form_set_error('upload', $message);
+        return FALSE;
+      }
+
+      // Move the file into temporary://
+      $file = file_unmanaged_copy($_FILES['files']['tmp_name']['upload'], 'temporary://' . $_FILES['files']['name']['upload'], FILE_EXISTS_RENAME);
+      if (!$file) {
+        form_set_error('upload', t('The specified file %name could not be copied to %destination.', array(
+          '%name' => $_FILES['files']['name']['upload'],
+          '%destination' => 'temporary://' . $_FILES['files']['name']['upload'],
+        )));
+        return FALSE;
+      }
+
+      $form_state['values']['file'] = $file;
+      break;
   }
+
   if ((int) $form_state['values']['count'] < 1) {
     form_set_error('count', t('Count must be integer > 0'));
   }
@@ -56,46 +141,94 @@ function simplytest_import_form_validate($form, &$form_state) {
  * Submit handler for building the batch.
  */
 function simplytest_import_form_submit($form, &$form_state) {
-  // Load the XML file.
-  $xml = simplexml_load_file($form_state['values']['pathname']);
-  $projects = count($xml->project);
-  $count = (int) $form_state['values']['count'];
-
-  $ops = array();
-
-  // Create operations with the specified count of imports.
-  for ($index = 0; $index < $projects; $index += $count) {
-    if (!isset($xml->project[$index])) {
-      break;
-    }
-    $ops[] = array(
-      'simplytest_import_batch_operation',
-      array(range($index, $index + $count - 1), $form_state['values']['pathname']),
-    );
-  }
-
   // Make sure table is empty.
   db_truncate('simplytest_projects')->execute();
 
-  watchdog('simplytest_import', 'Started to import XML project file: %file', array('%file' => $form_state['values']['pathname']), WATCHDOG_NOTICE);
+  // Prepare batch.
+  $batch = array(
+    'title' => t('Importing projects'),
+    'operations' => array(),
+  );
 
-  batch_set(array(
-    'operations' => $ops,
-  ));
+  switch ($form_state['values']['method']) {
+    case 'path':
+      $file = $form_state['values']['path'];
+      break;
+
+    case 'upload':
+      $file = $form_state['values']['file'];
+      break;
+
+    case 'download':
+      $file = 'temporary://projects-' . REQUEST_TIME . '.xml';
+      $batch['init_message'] = t('Downloading data. <br /><em><strong>Note:</strong> This may take a while.</em>');
+      $batch['operations'][] = array('simplytest_import_batch_operation_download_xml', array($file));
+      break;
+  }
+
+  // Set Batch.
+  $batch['operations'][] = array('simplytest_import_batch_operation_process_xml', array($file));
+  batch_set($batch);
+
+  // Log watchdog message.
+  watchdog('simplytest_import', 'Started to import XML project file: %file', array('%file' => $file), WATCHDOG_NOTICE);
+
+  // Store last chosen values as defaults.
+  form_state_values_clean($form_state);
+  variable_set('simplytest_import', $form_state['values']);
 }
 
 /**
- * Batch operation.
+ * Batch operation; Download the XML file.
  */
-function simplytest_import_batch_operation($ids, $file, &$context) {
+function simplytest_import_batch_operation_download_xml($file, &$context) {
+  set_time_limit(0);
+
+  $fp = fopen($file, 'w+');
+  $ch = curl_init('http://updates.drupal.org/release-history/project-list/all');
+
+  curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+  curl_setopt($ch, CURLOPT_FILE, $fp);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
+
+  curl_exec($ch);
+  curl_close($ch);
+  fclose($fp);
+}
+
+/**
+ * Batch operation; Process the XML file.
+ */
+function simplytest_import_batch_operation_process_xml($file, &$context) {
+  // Load the projects data as a SimpleXML object.
   $xml = simplexml_load_file($file);
 
-  // Iterate through projects of this round.
-  foreach ($ids as $id) {
-    if (!isset($xml->project[$id])) {
-      break;
+  // Setup the batch information on first run.
+  if (!isset($context['sandbox']['index'])) {
+    $defaults = variable_get('simplytest_import', array('count' => 100));
+
+    $context['sandbox']['max'] = count($xml->project);
+    $context['sandbox']['count'] = $defaults['count'];
+    $context['sandbox']['index'] = 0;
+  }
+
+  // Iterate through projects.
+  $count = 0;
+  while ($context['sandbox']['index'] < $context['sandbox']['max'] && $count < $context['sandbox']['count']) {
+    if (isset($xml->project[$context['sandbox']['index']])) {
+      simplytest_projects_xml_insert_project($xml->project[$context['sandbox']['index']]);
     }
-    // Add each project's initial data.
-    simplytest_projects_xml_insert_project($xml->project[$id]);
+
+    $context['sandbox']['index']++;
+    $count++;
+  }
+
+  // Provide contextual information for the Batch API frontend.
+  $context['message'] = t('Projects imported: @index of @max.', array(
+    '@index' => $context['sandbox']['index'],
+    '@max' => $context['sandbox']['max'],
+  ));
+  if ($context['sandbox']['index'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['index'] / $context['sandbox']['max'];
   }
 }

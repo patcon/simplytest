@@ -1,0 +1,12 @@
+<?php
+/**
+ * @file
+ * Uninstall function for the Simplytest import module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function simplytest_import_uninstall() {
+  variable_del('simplytest_import');
+}
