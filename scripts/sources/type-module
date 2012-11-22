@@ -66,9 +66,9 @@ s_project_fetch_dependencies() {
   if [[ -n "$S_MAKEFILE" ]]; then
     lg "-> found makefile: $S_MAKEFILE"
     # Try to execute the makefile (eg. for downloading missing libraries).
-    cd "/home/$S_ID/www/sites/default/modules/$S_PROJECT"
+    cd "/home/$S_ID/www"
     lg "Executing makefile.."
-    timeout 350 drush make --force-complete --contrib-destination="sites/default" --no-core "/home/$S_ID/$S_PROJECT/$S_MAKEFILE" -y
+    timeout 350 drush make --force-complete --contrib-destination="sites/all" --no-core "/home/$S_ID/$S_PROJECT/$S_MAKEFILE" -y
   fi
 }
 
