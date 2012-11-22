@@ -1,6 +1,9 @@
 simplytest.me
 =============
 
+[![Build
+Status](https://secure.travis-ci.org/patcon/simplytest.png?branch=travis-ci)](https://travis-ci.org/patcon/simplytest)
+
 An online service that provides on-demand sandbox environments for
 evaluating drupal.org project like modules, themes and distributions.
 
